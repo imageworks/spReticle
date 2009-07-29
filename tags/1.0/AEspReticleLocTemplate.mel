@@ -1,0 +1,706 @@
+///////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2009, Sony Pictures Imageworks
+// All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+// 
+// Redistributions of source code must retain the above copyright notice,
+// this list of conditions and the following disclaimer.
+// Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+// Neither the name of the organization Sony Pictures Imageworks nor the
+// names of its contributors
+// may be used to endorse or promote products derived from this software
+// without specific prior written permission.
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+// PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER
+// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+// LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+// NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+///////////////////////////////////////////////////////////////////////////////
+
+
+proc int round(float $num)
+{
+    int $rounded = int( $num + 0.5 * sign( $num ) );
+    return $rounded;
+}
+
+proc float precision(float $num, int $places)
+{
+    int $base = pow(10,$places);
+    float $newNum = round($num*$base)/float($base);
+    return $newNum;
+}
+
+global proc AEspReticleLocUpdateLabel(string $attr, string $fl)
+{
+    // limit label to two decimal digits
+    float $aspectRatio = getAttr($attr+".aspectRatio");
+    int $ratio = $aspectRatio * 100.0 + 0.5;
+    $aspectRatio = $ratio / 100.0;
+    frameLayout -edit -label $aspectRatio $fl;
+}
+
+global proc AEspReticleLocNewAspectRatio(string $attr, int $index)
+{
+    $attr += "["+$index+"]";
+    setAttr ($attr+".displayMode") 1;
+
+    if ($index != 0) setAttr ($attr+".maskColor") 1 1 1;
+}
+
+proc drawAspectRatio( string $attr, string $fl )
+{
+    attrEnumOptionMenuGrp -attribute ($attr+".displayMode") -label "Display Mode";
+    attrControlGrp -attribute ($attr+".aspectRatio") -cc ("AEspReticleLocUpdateLabel(\\\""+$attr+"\\\",\\\""+$fl+"\\\");");
+    attrColorSliderGrp -attribute ($attr+".aspectMaskColor") -label "Mask Color";
+    attrControlGrp -attribute ($attr+".aspectMaskTrans");
+    attrColorSliderGrp -attribute ($attr+".aspectLineColor") -label "Line Color";
+    attrControlGrp -attribute ($attr+".aspectLineTrans");
+    attrControlGrp -attribute ($attr+".aspectDisplaySafeAction") -label "Display Safe Action (90%)";
+    attrControlGrp -attribute ($attr+".aspectDisplaySafeTitle") -label "Display Safe Title (80%)";
+    button -label "remove aspect ratio" -command ("removeMultiInstance "+$attr);
+}
+
+global proc AEspReticleLocNewText(string $attr, int $index)
+{
+    $attr += "["+$index+"]";
+    setAttr ($attr+".textType") 0;
+}
+
+proc drawText( string $attr, string $fl, int $i )
+{
+    attrEnumOptionMenuGrp -attribute ($attr+".textType") -label "Text Type";
+    attrControlGrp -attribute ($attr+".textStr");
+    attrEnumOptionMenuGrp -attribute ($attr+".textAlign") -label "Text Alignment";
+    attrFieldGrp -attribute ($attr+".textPos") -label "Text Position";
+    attrEnumOptionMenuGrp -attribute ($attr+".textPosRel") -label "Text Position Relative To";
+    attrEnumOptionMenuGrp -attribute ($attr+".textLevel") -label "Anchor Text To";
+    attrControlGrp -attribute ($attr+".textARLevel") -label "Aspect Ratio Level";
+    attrControlGrp -attribute ($attr+".textColor") -label "Text Color";
+    attrControlGrp -attribute ($attr+".textTrans") -label "Text Transp.";
+    button -label "remove text" -command ("removeMultiInstance "+$attr);
+}
+
+proc setSafeActionTitle(string $node, string $format)
+{
+    string $saAttr = "safeAction";
+    string $stAttr = "safeTitle";
+
+    switch ($format)
+    {
+        case "35mm" :
+            setAttr ($node+$saAttr) 0.713 0.535;
+            setAttr ($node+$stAttr) 0.630 0.475;
+            break;
+    }
+}
+
+proc getFilmback( string $node )
+{
+    string $attr = "filmbackAperture";
+    string $saAttr = "safeAction";
+    string $stAttr = "safeTitle";
+    string $optionMenu = "AEspReticleLocCameraPresets";
+
+    global float $spShowCameraHorizFilmAperature;
+    global float $spShowCameraVertFilmAperature;
+    float $hfa = precision($spShowCameraHorizFilmAperature,4);
+    float $vfa = precision($spShowCameraVertFilmAperature,4);
+
+    float $camAp[] = `getAttr ($node+$attr)`;
+    $camAp[0] = precision($camAp[0],4);
+    $camAp[1] = precision($camAp[1],4);
+
+    if ($camAp[0] == 0.98 && $camAp[1] == 0.735)
+    {
+        optionMenuGrp -edit -select 1 $optionMenu;
+        AEspReticleLocSetFilmback($node,"Full Aperture");
+        return;
+    }
+    if ($camAp[0] == 0.864 && $camAp[1] == 0.630)
+    {
+        optionMenuGrp -edit -select 2 $optionMenu;
+        AEspReticleLocSetFilmback($node,"Academy Aperture");
+        return;
+    }
+    if ($camAp[0] == 0.968 && $camAp[1] == 0.735)
+    {
+        optionMenuGrp -edit -select 3 $optionMenu;
+        AEspReticleLocSetFilmback($node,"Sony Full Aperture");
+        return;
+    }
+    if ($camAp[0] == 0.864 && $camAp[1] == 0.735)
+    {
+        optionMenuGrp -edit -select 4 $optionMenu;
+        AEspReticleLocSetFilmback($node,"Sony Academy Aperture");
+        return;
+    }
+    if ($camAp[0] == $hfa && $camAp[1] == $vfa)
+    {
+        optionMenuGrp -edit -select 5 $optionMenu;
+        AEspReticleLocSetFilmback($node,"Show Filmback");
+        return;
+    }
+    if ($camAp[0] == -1 && $camAp[1] == -1 )
+    {
+        optionMenuGrp -edit -select 6 $optionMenu;
+        AEspReticleLocSetFilmback($node,"Use Camera Aperture");
+        return;
+    }
+
+    AEspReticleLocSetFilmback($node,"User Defined");
+    optionMenuGrp -edit -select 7 $optionMenu;
+}
+
+global proc AEspReticleLocSetFilmback( string $node, string $setting )
+{
+    string $attr  = "filmbackAperture";
+    string $sAttr = "soundTrackWidth";
+    string $saAttr = "safeAction";
+    string $stAttr = "safeTitle";
+    string $pAttr = "usePad";
+    string $paAttr = "padAmount";
+
+    global float $spShowCameraHorizFilmAperature;
+    global float $spShowCameraVertFilmAperature;
+    global float $spShowCameraFilmAperaturePad;
+
+    float $hfa = precision(getAttr ($node + "horizontalFilmAperture"),4);
+    float $vfa = precision(getAttr ($node + "verticalFilmAperture"),4);
+    float $newHfa = 0;
+    float $newVfa = 0;
+
+    switch ($setting)
+    {
+        case "Full Aperture" :
+            $newHfa = 0.98;
+            $newVfa = 0.735;
+            setAttr ($node+$attr) 0.98 0.735;
+            setAttr ($node+$sAttr) 0.112;
+            setAttr ($node+$pAttr) 0;
+            setAttr ($node+$paAttr) 0.0 0.0;
+            setSafeActionTitle($node,"35mm");
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
+            break;
+        case "Academy Aperture" :
+            $newHfa = 0.864;
+            $newVfa = 0.630;
+            setAttr ($node+$attr) 0.864 0.630;
+            setAttr ($node+$sAttr) 0.0;
+            setAttr ($node+$pAttr) 0;
+            setAttr ($node+$paAttr) 0.0 0.0;
+            setSafeActionTitle($node,"35mm");
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
+            break;
+        case "Sony Full Aperture" :
+            $newHfa = 0.968;
+            $newVfa = 0.735;
+            setAttr ($node+$attr) 0.968 0.735;
+            setAttr ($node+$sAttr) 0.104;
+            setAttr ($node+$pAttr) 0;
+            setAttr ($node+$paAttr) 0.0 0.0;
+            setSafeActionTitle($node,"35mm");
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
+            break;
+        case "Sony Academy Aperture" :
+            $newHfa = 0.864;
+            $newVfa = 0.735;
+            setAttr ($node+$attr) 0.864 0.735;
+            setAttr ($node+$sAttr) 0.0;
+            setAttr ($node+$pAttr) 0;
+            setAttr ($node+$paAttr) 0.0 0.0;
+            setSafeActionTitle($node,"35mm");
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
+            break;
+        case "Show Filmback" :
+            $newHfa = $spShowCameraHorizFilmAperature;
+            $newVfa = $spShowCameraVertFilmAperature;
+            setAttr ($node+$attr) $spShowCameraHorizFilmAperature $spShowCameraVertFilmAperature;
+            setAttr ($node+$sAttr) 0.0;
+            int $pad = 0;
+            if (catchQuiet($pad = float($spShowCameraFilmAperaturePad) != 0) || $pad == 0) {
+                setAttr ($node+$pAttr) 0;
+                setAttr ($node+$pAttr) 0.0 0.0;
+            }
+            else {
+                setAttr ($node+$pAttr) 1;
+                setAttr ($node+$paAttr) $spShowCameraFilmAperaturePad $spShowCameraFilmAperaturePad;
+            }
+            setSafeActionTitle($node,"35mm");
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
+            break;
+        case "Use Camera Aperture" :
+            setAttr ($node+$attr) -1 -1;
+            setAttr ($node+$sAttr) 0.0;
+            setSafeActionTitle($node,"35mm");
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
+        break;
+        case "User Defined" :
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 1 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 1 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 1 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 1 ("AEspReticleLoc"+$stAttr);
+            break;
+    }
+
+    if (($newHfa && $newVfa) && (($newHfa != $hfa) || 
+        ($newVfa != $vfa)) && (about("-batch") == 0))
+    {
+        string $result = `confirmDialog -title "Update cameras?"
+                -message "Would you like me to update the cameras with the new filmback values?"
+                -button	"Yes"
+                -button "No"`;
+        if ($result == "Yes")
+        {
+            string $attrs[] = {".cameraAperture",".hfa",".vfa"};
+            int $locked[];
+            string $cameras[] = ls("-ca");
+            for ($camera in $cameras)
+            {
+                if (!getAttr($camera+".orthographic"))
+                {
+                    for ($i = 0; $i < size($attrs); $i++)
+                    {
+                        $locked[$i] = getAttr("-lock",$camera+$attrs[$i]);
+                        if ($locked[$i])
+                            setAttr -lock 0 ($camera+$attrs[$i]);
+                    }
+                    setAttr ($camera+".cameraAperture") $newHfa $newVfa;
+                    for ($i = 0; $i < size($attrs); $i++)
+                    {
+                        if ($locked[$i])
+                            setAttr -lock 1 ($camera+$attrs[$i]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+global proc AEspReticleLocUpdateFilmback( string $node )
+{
+    string $optionMenu = "AEspReticleLocCameraPresets";
+
+    if (!`optionMenuGrp -exists $optionMenu`)
+    {
+        AEspReticleLocDrawFilmback( $node );
+        return;
+    }
+
+    optionMenuGrp -edit -cc ("AEspReticleLocSetFilmback(\""+$node+"\",\"#1\")") $optionMenu;
+    getFilmback($node);
+}
+
+global proc AEspReticleLocDrawFilmback( string $node )
+{
+    string $optionMenu = "AEspReticleLocCameraPresets";
+    string $attr  = "filmbackAperture";
+    string $lAttr = "lensSqueezeRatio";
+    string $sAttr = "soundTrackWidth";
+    string $saAttr = "safeAction";
+    string $stAttr = "safeTitle";
+
+    optionMenuGrp -l "Filmback Presets" -cc ("AEspReticleLocSetFilmback(\""+$node+"\",\"#1\")") $optionMenu;
+    menuItem -label "Full Aperture";
+    menuItem -label "Academy Aperture";
+    menuItem -label "Sony Full Aperture";
+    menuItem -label "Sony Academy Aperture";
+    menuItem -label "Show Filmback";
+    menuItem -label "Use Camera Aperture";
+    menuItem -label "User Defined";
+        
+    attrFieldGrp -label "Filmback Aperture" -attribute ($node+$attr) ("AEspReticleLoc"+$attr);
+    attrControlGrp -attribute ($node+$sAttr) ("AEspReticleLoc"+$sAttr);
+    attrFieldGrp -label "Safe Action Area" -attribute ($node+$saAttr) ("AEspReticleLoc"+$saAttr);
+    attrFieldGrp -label "Safe Title Area" -attribute ($node+$stAttr) ("AEspReticleLoc"+$stAttr);
+
+    getFilmback($node);
+}
+
+proc getProjection( string $node )
+{
+    string $attr = "projectionGate";
+    string $optionMenu = "AEspReticleLocProjectionPresets";
+
+    float $projGate[] = `getAttr ($node+$attr)`;
+    $projGate[0] = precision($projGate[0],3);
+    $projGate[1] = precision($projGate[1],3);
+
+    if ($projGate[0] == 0.825 && $projGate[1] == 0.446)
+    {
+        optionMenuGrp -edit -select 1 $optionMenu;
+        AEspReticleLocSetProjection($node,"1.85 Projection");
+        return;
+    }
+    if ($projGate[0] == 0.825 && $projGate[1] == 0.471)
+    {
+        optionMenuGrp -edit -select 2 $optionMenu;
+        AEspReticleLocSetProjection($node,"1.75 Projection");
+        return;
+    }
+    if ($projGate[0] == 0.825 && $projGate[1] == 0.497)
+    {
+        optionMenuGrp -edit -select 3 $optionMenu;
+        AEspReticleLocSetProjection($node,"1.66 Projection");
+        return;
+    }
+    if ($projGate[0] == 0.825 && $projGate[1] == 0.602)
+    {
+        optionMenuGrp -edit -select 4 $optionMenu;
+        AEspReticleLocSetProjection($node,"1.37 Projection");
+        return;
+    }
+    if ($projGate[0] == 0.825 && $projGate[1] == 0.690)
+    {
+        optionMenuGrp -edit -select 5 $optionMenu;
+        AEspReticleLocSetProjection($node,"2.39 Anamorphic");
+        return;
+    }
+
+    AEspReticleLocSetProjection($node,"User Defined");
+    optionMenuGrp -edit -select 6 $optionMenu;
+}
+
+global proc AEspReticleLocSetProjection( string $node, string $setting )
+{
+    string $attr = "projectionGate";
+    string $paAttr = "projectionAspect";
+
+    switch ($setting)
+    {
+        case "1.85 Projection" :
+            setAttr ($node+$attr) 0.825 0.446;
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$paAttr);
+            break;
+        case "1.75 Projection" :
+            setAttr ($node+$attr) 0.825 0.471;
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$paAttr);
+            break;
+        case "1.66 Projection" :
+            setAttr ($node+$attr) 0.825 0.497;
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$paAttr);
+            break;
+        case "1.37 Projection" :
+            setAttr ($node+$attr) 0.825 0.602;
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$paAttr);
+            break;
+        case "2.39 Anamorphic" :
+            setAttr ($node+$attr) 0.825 0.690;
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$paAttr);
+            break;
+        case "User Defined" :
+            floatFieldGrp -edit -enable 1 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 1 ("AEspReticleLoc"+$paAttr);
+            break;
+        case "projGate" :
+            break;
+        case "projAR" :
+            float $projGate[] = `floatFieldGrp -query -value ("AEspReticleLoc"+$attr)`;
+            float $projAR[] = `floatFieldGrp -query -value ("AEspReticleLoc"+$paAttr)`;
+            $projGate[0] = precision($projGate[0],3);
+            $projGate[1] = precision($projGate[0]/$projAR[0],3);
+            foatFieldGrp -edit -value2 $projGate[1] ("AEspReticleLoc"+$attr);
+            return;
+    }
+
+    float $projGate[] = `floatFieldGrp -query -value ("AEspReticleLoc"+$attr)`;
+    float $ar = precision($projGate[0]/$projGate[1],3);
+    floatFieldGrp -edit -value1 $ar ("AEspReticleLoc"+$paAttr);
+}
+
+global proc AEspReticleLocUpdateProjection ( string $attr, string $node )
+{
+    string $optionMenu = "AEspReticleLocProjectionPresets";
+    $attr = "projectionGate";
+    string $paAttr = "projectionAspect";
+
+    if (!`optionMenuGrp -exists $optionMenu`)
+    {
+        AEspReticleLocDrawProjection( $attr, $node );
+        return;
+    }
+
+    optionMenuGrp -edit -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"#1\")") $optionMenu;
+    floatFieldGrp -edit -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"projGate\")") ("AEspReticleLoc"+$attr);
+    connectControl -index 2 ("AEspReticleLoc"+$attr) ($node+"horizontalProjectionGate");
+    connectControl -index 3 ("AEspReticleLoc"+$attr) ($node+"verticalProjectionGate");
+    floatFieldGrp -edit -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"projAR\")")   ("AEspReticleLoc"+$paAttr);
+    getProjection($node);
+}
+
+global proc AEspReticleLocDrawProjection( string $attr, string $node )
+{
+    string $optionMenu = "AEspReticleLocProjectionPresets";
+    $attr = "projectionGate";
+    string $paAttr = "projectionAspect";
+
+    optionMenuGrp -l "Proj. Presets" -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"#1\")") $optionMenu;
+    menuItem -label "1.85 Projection";
+    menuItem -label "1.75 Projection";
+    menuItem -label "1.66 Projection";
+    menuItem -label "1.37 Projection";
+    menuItem -label "2.39 Anamorphic";
+    menuItem -label "User Defined";
+        
+    floatFieldGrp -label "Proj. Aperture" -nf 2 -pre 3 -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"projGate\")") ("AEspReticleLoc"+$attr);
+    connectControl -index 2 ("AEspReticleLoc"+$attr) ($node+"horizontalProjectionGate");
+    connectControl -index 3 ("AEspReticleLoc"+$attr) ($node+"verticalProjectionGate");
+    floatFieldGrp -label "Proj. Aspect Ratio" -nf 1 -pre 3 -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"projAR\")") ("AEspReticleLoc"+$paAttr);
+    getProjection($node);
+}
+
+global proc AEspReticleLocDrawAspectRatios( string $attr )
+{
+    string $frameLayout = "AEspReticleLocAspectRatios";
+    if (`frameLayout -ex $frameLayout`)
+    {
+        deleteUI $frameLayout;
+    }
+
+    frameLayout -label "Aspect Ratios" $frameLayout;
+    columnLayout;
+
+    int $numARs = `getAttr -s $attr`;
+    for ($i = 0; $i < $numARs; $i++)
+    {
+        float $aspectRatio = spSprintf("%1.2f",`getAttr ($attr+"["+$i+"].aspectRatio")`);
+        string $fl = `frameLayout -label $aspectRatio ("AEspReticleLocFL"+$i)`;
+        columnLayout ($fl+"CL");
+        drawAspectRatio( ($attr+"["+$i+"]") , $fl);
+        setParent ..;
+        setParent ..;
+    }
+    button -label "add new aspect ratio" -command ("AEspReticleLocNewAspectRatio(\""+$attr+"\",\""+$numARs+"\");");
+}
+
+global proc AEspReticleLocDrawText( string $attr )
+{
+    string $textTypes[] = {"String","Lens","Frame Number","Aspect Ratio","Max. Distance","Proj. Gate"};
+
+    string $frameLayout = "AEspReticleLocText";
+    if (`frameLayout -ex $frameLayout`)
+    {
+        deleteUI $frameLayout;
+    }
+
+    frameLayout -label "Text" $frameLayout;
+    columnLayout;
+
+    int $numText = `getAttr -s $attr`;
+    for ($i = 0; $i < $numText; $i++)
+    {
+        string $label = getAttr("-asString",($attr+"["+$i+"].textType"));
+        if ($label == "String") 
+        {
+            string $str = getAttr($attr+"["+$i+"].textStr");
+            if (size($str) > 15)
+                $str = substring($str,1,15)+"...";
+            if (size($str) > 0)
+                $label += " - " + $str;
+        }
+        string $fl = `frameLayout -label ($label) ("AEspReticleLocFL"+$i)`;
+        columnLayout ($fl+"CL");
+        drawText( ($attr+"["+$i+"]") , $fl, $i);
+        setParent ..;
+        setParent ..;
+    }
+    button -label "add new text" -command ("AEspReticleLocNewText(\""+$attr+"\",\""+$numText+"\");");
+}
+
+proc excludeAttributes()
+{
+    editorTemplate -beginNoOptimize;
+        editorTemplate -suppress "drawOverride";
+        editorTemplate -suppress "projectionGate";
+        editorTemplate -suppress "panScan";
+        editorTemplate -suppress "time";
+        editorTemplate -suppress "aspectRatios";
+        editorTemplate -suppress "filmbackAperture";
+        editorTemplate -suppress "soundTrackWidth";
+        editorTemplate -suppress "safeAction";
+        editorTemplate -suppress "safeTitle";
+        editorTemplate -suppress "text";
+        editorTemplate -suppress "pad";
+
+        editorTemplate -suppress "instObjGroups";
+        editorTemplate -suppress "useObjectColor";
+        editorTemplate -suppress "lodVisibility";
+        editorTemplate -suppress "localPosition";
+        editorTemplate -suppress "nodeState";
+        editorTemplate -suppress "castsShadows";
+        editorTemplate -suppress "receiveShadows";
+        editorTemplate -suppress "motionBlur";
+        editorTemplate -suppress "primaryVisibility";
+        editorTemplate -suppress "visibleInReflections";
+        editorTemplate -suppress "visibleInRefractions";
+        editorTemplate -suppress "doubleSided";
+        editorTemplate -suppress "opposite";
+        editorTemplate -suppress "geometryAntialiasingOverride";
+        editorTemplate -suppress "antialiasingLevel";
+        editorTemplate -suppress "shadingSamplesOverride";
+        editorTemplate -suppress "shadingSamples";
+        editorTemplate -suppress "maxShadingSamples";
+        editorTemplate -suppress "volumeSamplesOverride";
+        editorTemplate -suppress "volumeSamples";
+        editorTemplate -suppress "depthJitter";
+        editorTemplate -suppress "maxVisibilitySamplesOverride";
+        editorTemplate -suppress "maxVisibilitySamples";
+        editorTemplate -suppress "boundingBoxScale"; 
+        editorTemplate -suppress "featureDisplacement";
+        editorTemplate -suppress "initialSampleRate";
+        editorTemplate -suppress "extraSampleRate";
+        editorTemplate -suppress "textureThreshold";
+        editorTemplate -suppress "normalThreshold";
+        editorTemplate -suppress "ghosting";
+        editorTemplate -suppress "ghostingControl";
+        editorTemplate -suppress "ghostPreSteps";
+        editorTemplate -suppress "ghostPostSteps";
+        editorTemplate -suppress "ghostStepSize";
+        editorTemplate -suppress "ghostFrames";
+        editorTemplate -suppress "ghostRangeStart";
+        editorTemplate -suppress "ghostRangeEnd";
+        editorTemplate -suppress "ghostDriver";
+        editorTemplate -suppress "ghostFrames";
+        editorTemplate -suppress "ghostCustomSteps";
+        editorTemplate -suppress "drawOverride";
+        editorTemplate -suppress "useObjectColor";
+        editorTemplate -suppress "objectColor";
+        editorTemplate -suppress "center";
+        editorTemplate -suppress "matrix";
+        editorTemplate -suppress "inverseMatrix";
+        editorTemplate -suppress "worldMatrix";
+        editorTemplate -suppress "worldInverseMatrix";
+        editorTemplate -suppress "parentMatrix";
+        editorTemplate -suppress "parentInverseMatrix";
+        editorTemplate -suppress "instObjGroups";
+        editorTemplate -suppress "renderInfo";
+        editorTemplate -suppress "ignoreSelfShadowing";
+        editorTemplate -suppress "caching";
+        editorTemplate -suppress "intermediateObject";
+        editorTemplate -suppress "compInstObjGroups";
+        editorTemplate -suppress "localScale";
+        editorTemplate -suppress "renderLayerInfo";
+
+    editorTemplate -endNoOptimize;
+}
+
+global proc AEspReticleLocTemplate( string $nodeName )
+{
+    AEswatchDisplay $nodeName;
+    editorTemplate -beginScrollLayout;
+        editorTemplate -beginNoOptimize;
+            editorTemplate -addControl "visibility";
+            editorTemplate -addControl "drawingEnabled";
+            editorTemplate -label "Not Selectable" -addControl "template";
+        editorTemplate -endNoOptimize;
+
+    editorTemplate -beginLayout "Filmback Attributes" -collapse 1;
+        editorTemplate -addControl "displayFilmGate";
+        editorTemplate -callCustom "AEspReticleLocDrawFilmback" "AEspReticleLocUpdateFilmback" "";
+        editorTemplate -addControl "filmGateColor";
+        editorTemplate -addControl "filmGateTrans";
+        editorTemplate -beginNoOptimize;
+            editorTemplate -addControl "displaySafeAction";
+            editorTemplate -addControl "displaySafeTitle";
+        editorTemplate -endNoOptimize;
+    editorTemplate -endLayout;
+    editorTemplate -beginLayout "Projection Gate Attributes" -collapse 1;
+        editorTemplate -addControl "displayProjGate";
+        editorTemplate -callCustom "AEspReticleLocDrawProjection" "AEspReticleLocUpdateProjection" "projectionGate" "";
+        editorTemplate -addControl "projGateColor";
+        editorTemplate -addControl "projGateTrans";
+    editorTemplate -endLayout;
+    editorTemplate -beginLayout "Pan and Scan Attributes" -collapse 1;
+        editorTemplate -label "Display Mode" -addControl "panScanDisplayMode";
+        editorTemplate -label "Aspect Ratio" -addControl "panScanAspectRatio";
+        editorTemplate -label "Pan/Scan Aspect Ratio" -addControl "panScanRatio";
+        editorTemplate -label "Pan/Scan Offset" -addControl "panScanOffset";
+        editorTemplate -label "Mask Color" -addControl "panScanMaskColor";
+        editorTemplate -label "Mask Transp." -addControl "panScanMaskTrans";
+        editorTemplate -label "Line Color" -addControl "panScanLineColor";
+        editorTemplate -label "Line Transp." -addControl "panScanLineTrans";
+        editorTemplate -beginNoOptimize;
+            editorTemplate -label "Display Safe Action (90%)" -addControl "panScanDisplaySafeAction";
+            editorTemplate -label "Display Safe Title (80%)" -addControl "panScanDisplaySafeTitle";
+        editorTemplate -endNoOptimize;
+    editorTemplate -endLayout;
+    editorTemplate -beginLayout "Pad Attributes" -collapse 1;
+        editorTemplate -label "Use Pad" -addControl "usePad";
+        editorTemplate -addControl "padAmount";
+        editorTemplate -label "Display Mode" -addControl "padDisplayMode";
+        editorTemplate -label "Mask Color" -addControl "padMaskColor";
+        editorTemplate -label "Mask Transp." -addControl "padMaskTrans";
+        editorTemplate -label "Line Color" -addControl "padLineColor";
+        editorTemplate -label "Line Transp." -addControl "padLineTrans";
+    editorTemplate -endLayout;
+    editorTemplate -callCustom "AEspReticleLocDrawAspectRatios" "AEspReticleLocDrawAspectRatios" "aspectRatios";
+    editorTemplate -callCustom "AEspReticleLocDrawText" "AEspReticleLocDrawText" "text";
+    editorTemplate -beginLayout "Options" -collapse 1;
+        editorTemplate -label "Text Color" -addControl "miscTextColor";
+        editorTemplate -label "Text Transp." -addControl "miscTextTrans";
+        editorTemplate -addControl "lineColor";
+        editorTemplate -addControl "lineTrans";
+        editorTemplate -addSeparator;
+        editorTemplate -addControl "displayLens";
+        editorTemplate -addControl "displayFrame";
+        editorTemplate -addControl "displayLineH";
+        editorTemplate -addControl "displayLineV";
+        editorTemplate -addControl "displayThirdsH";
+        editorTemplate -addControl "displayThirdsV";
+        editorTemplate -addControl "displayCrosshair";
+        editorTemplate -addControl "displayAspectText";
+        editorTemplate -addSeparator;
+        editorTemplate -addControl "hideLocator";
+        editorTemplate -addControl "useSpReticle";
+        editorTemplate -addControl "driveCameraAperture";
+        editorTemplate -addControl "useOverscan";
+        editorTemplate -addControl "maximumDistance";
+    editorTemplate -endLayout;
+
+    // include/call base class/node attributes
+    //AEdependNodeTemplate $nodeName;
+    //AElocatorInclude $nodeName;
+
+    //exclude attributes
+    excludeAttributes;
+
+    editorTemplate -addExtraControls;
+    editorTemplate -endScrollLayout;
+}
+
