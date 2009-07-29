@@ -7,7 +7,7 @@
 C++           = g++
 
 NO_TRANS_LINK =
-CFLAGS        = -DLINUX -D_BOOL -DREQUIRE_IOSTREAM -DBits64_ -DLINUX_64 -fPIC -O3
+CFLAGS        = -DLINUX -D_BOOL -DREQUIRE_IOSTREAM -DBits64_ -DLINUX_64 -fPIC -O3 
 C++FLAGS      = $(CFLAGS) -Wno-deprecated -fno-gnu-keywords
 
 LD            = $(C++) $(NO_TRANS_LINK) $(C++FLAGS) -Wl,-Bsymbolic -shared
