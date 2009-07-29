@@ -19,7 +19,7 @@ LIBS          = -L$(MAYA_LOCATION)/lib
 	$(C++) -c $(INCLUDES) $(C++FLAGS) $<
 
 plugins: \
-    spReticuleLoc.so
+    spReticleLoc.so
 
 clean:
 	-rm -f *.o
@@ -31,7 +31,7 @@ Clean:
 # Specific Rules #
 ##################
 
-spReticuleLoc.so: spReticuleLoc.o
+spReticleLoc.so: spReticleLoc.o
 	-rm -f $@
-	$(LD) -o $@ spReticuleLoc.o $(LIBS) -lOpenMaya -lOpenMayaUI -lOpenMayaAnim
+	$(LD) -o $@ spReticleLoc.o $(LIBS) -lOpenMaya -lOpenMayaUI -lOpenMayaAnim
 

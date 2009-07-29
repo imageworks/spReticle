@@ -44,7 +44,7 @@ proc float precision(float $num, int $places)
     return $newNum;
 }
 
-global proc AEspReticuleLocUpdateLabel(string $attr, string $fl)
+global proc AEspReticleLocUpdateLabel(string $attr, string $fl)
 {
     // limit label to two decimal digits
     float $aspectRatio = getAttr($attr+".aspectRatio");
@@ -53,7 +53,7 @@ global proc AEspReticuleLocUpdateLabel(string $attr, string $fl)
     frameLayout -edit -label $aspectRatio $fl;
 }
 
-global proc AEspReticuleLocNewAspectRatio(string $attr, int $index)
+global proc AEspReticleLocNewAspectRatio(string $attr, int $index)
 {
     $attr += "["+$index+"]";
     setAttr ($attr+".displayMode") 1;
@@ -64,7 +64,7 @@ global proc AEspReticuleLocNewAspectRatio(string $attr, int $index)
 proc drawAspectRatio( string $attr, string $fl )
 {
     attrEnumOptionMenuGrp -attribute ($attr+".displayMode") -label "Display Mode";
-    attrControlGrp -attribute ($attr+".aspectRatio") -cc ("AEspReticuleLocUpdateLabel(\\\""+$attr+"\\\",\\\""+$fl+"\\\");");
+    attrControlGrp -attribute ($attr+".aspectRatio") -cc ("AEspReticleLocUpdateLabel(\\\""+$attr+"\\\",\\\""+$fl+"\\\");");
     attrColorSliderGrp -attribute ($attr+".aspectMaskColor") -label "Mask Color";
     attrControlGrp -attribute ($attr+".aspectMaskTrans");
     attrColorSliderGrp -attribute ($attr+".aspectLineColor") -label "Line Color";
@@ -74,7 +74,7 @@ proc drawAspectRatio( string $attr, string $fl )
     button -label "remove aspect ratio" -command ("removeMultiInstance "+$attr);
 }
 
-global proc AEspReticuleLocNewText(string $attr, int $index)
+global proc AEspReticleLocNewText(string $attr, int $index)
 {
     $attr += "["+$index+"]";
     setAttr ($attr+".textType") 0;
@@ -113,7 +113,7 @@ proc getFilmback( string $node )
     string $attr = "filmbackAperture";
     string $saAttr = "safeAction";
     string $stAttr = "safeTitle";
-    string $optionMenu = "AEspReticuleLocCameraPresets";
+    string $optionMenu = "AEspReticleLocCameraPresets";
 
     global float $spShowCameraHorizFilmAperature;
     global float $spShowCameraVertFilmAperature;
@@ -127,45 +127,45 @@ proc getFilmback( string $node )
     if ($camAp[0] == 0.98 && $camAp[1] == 0.735)
     {
         optionMenuGrp -edit -select 1 $optionMenu;
-        AEspReticuleLocSetFilmback($node,"Full Aperture");
+        AEspReticleLocSetFilmback($node,"Full Aperture");
         return;
     }
     if ($camAp[0] == 0.864 && $camAp[1] == 0.630)
     {
         optionMenuGrp -edit -select 2 $optionMenu;
-        AEspReticuleLocSetFilmback($node,"Academy Aperture");
+        AEspReticleLocSetFilmback($node,"Academy Aperture");
         return;
     }
     if ($camAp[0] == 0.968 && $camAp[1] == 0.735)
     {
         optionMenuGrp -edit -select 3 $optionMenu;
-        AEspReticuleLocSetFilmback($node,"Sony Full Aperture");
+        AEspReticleLocSetFilmback($node,"Sony Full Aperture");
         return;
     }
     if ($camAp[0] == 0.864 && $camAp[1] == 0.735)
     {
         optionMenuGrp -edit -select 4 $optionMenu;
-        AEspReticuleLocSetFilmback($node,"Sony Academy Aperture");
+        AEspReticleLocSetFilmback($node,"Sony Academy Aperture");
         return;
     }
     if ($camAp[0] == $hfa && $camAp[1] == $vfa)
     {
         optionMenuGrp -edit -select 5 $optionMenu;
-        AEspReticuleLocSetFilmback($node,"Show Filmback");
+        AEspReticleLocSetFilmback($node,"Show Filmback");
         return;
     }
     if ($camAp[0] == -1 && $camAp[1] == -1 )
     {
         optionMenuGrp -edit -select 6 $optionMenu;
-        AEspReticuleLocSetFilmback($node,"Use Camera Aperture");
+        AEspReticleLocSetFilmback($node,"Use Camera Aperture");
         return;
     }
 
-    AEspReticuleLocSetFilmback($node,"User Defined");
+    AEspReticleLocSetFilmback($node,"User Defined");
     optionMenuGrp -edit -select 7 $optionMenu;
 }
 
-global proc AEspReticuleLocSetFilmback( string $node, string $setting )
+global proc AEspReticleLocSetFilmback( string $node, string $setting )
 {
     string $attr  = "filmbackAperture";
     string $sAttr = "soundTrackWidth";
@@ -193,10 +193,10 @@ global proc AEspReticuleLocSetFilmback( string $node, string $setting )
             setAttr ($node+$pAttr) 0;
             setAttr ($node+$paAttr) 0.0 0.0;
             setSafeActionTitle($node,"35mm");
-            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticuleLoc"+$attr);
-            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticuleLoc"+$sAttr);
-            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticuleLoc"+$saAttr);
-            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticuleLoc"+$stAttr);
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
             break;
         case "Academy Aperture" :
             $newHfa = 0.864;
@@ -206,10 +206,10 @@ global proc AEspReticuleLocSetFilmback( string $node, string $setting )
             setAttr ($node+$pAttr) 0;
             setAttr ($node+$paAttr) 0.0 0.0;
             setSafeActionTitle($node,"35mm");
-            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticuleLoc"+$attr);
-            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticuleLoc"+$sAttr);
-            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticuleLoc"+$saAttr);
-            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticuleLoc"+$stAttr);
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
             break;
         case "Sony Full Aperture" :
             $newHfa = 0.968;
@@ -219,10 +219,10 @@ global proc AEspReticuleLocSetFilmback( string $node, string $setting )
             setAttr ($node+$pAttr) 0;
             setAttr ($node+$paAttr) 0.0 0.0;
             setSafeActionTitle($node,"35mm");
-            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticuleLoc"+$attr);
-            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticuleLoc"+$sAttr);
-            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticuleLoc"+$saAttr);
-            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticuleLoc"+$stAttr);
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
             break;
         case "Sony Academy Aperture" :
             $newHfa = 0.864;
@@ -232,10 +232,10 @@ global proc AEspReticuleLocSetFilmback( string $node, string $setting )
             setAttr ($node+$pAttr) 0;
             setAttr ($node+$paAttr) 0.0 0.0;
             setSafeActionTitle($node,"35mm");
-            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticuleLoc"+$attr);
-            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticuleLoc"+$sAttr);
-            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticuleLoc"+$saAttr);
-            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticuleLoc"+$stAttr);
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
             break;
         case "Show Filmback" :
             $newHfa = $spShowCameraHorizFilmAperature;
@@ -252,25 +252,25 @@ global proc AEspReticuleLocSetFilmback( string $node, string $setting )
                 setAttr ($node+$paAttr) $spShowCameraFilmAperaturePad $spShowCameraFilmAperaturePad;
             }
             setSafeActionTitle($node,"35mm");
-            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticuleLoc"+$attr);
-            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticuleLoc"+$sAttr);
-            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticuleLoc"+$saAttr);
-            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticuleLoc"+$stAttr);
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
             break;
         case "Use Camera Aperture" :
             setAttr ($node+$attr) -1 -1;
             setAttr ($node+$sAttr) 0.0;
             setSafeActionTitle($node,"35mm");
-            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticuleLoc"+$attr);
-            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticuleLoc"+$sAttr);
-            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticuleLoc"+$saAttr);
-            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticuleLoc"+$stAttr);
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 0 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 0 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 0 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 0 ("AEspReticleLoc"+$stAttr);
         break;
         case "User Defined" :
-            attrFieldGrp -edit -attribute ($node+$attr) -enable 1 ("AEspReticuleLoc"+$attr);
-            attrControlGrp -edit -attribute ($node+$sAttr) -enable 1 ("AEspReticuleLoc"+$sAttr);
-            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 1 ("AEspReticuleLoc"+$saAttr);
-            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 1 ("AEspReticuleLoc"+$stAttr);
+            attrFieldGrp -edit -attribute ($node+$attr) -enable 1 ("AEspReticleLoc"+$attr);
+            attrControlGrp -edit -attribute ($node+$sAttr) -enable 1 ("AEspReticleLoc"+$sAttr);
+            attrFieldGrp -edit -attribute ($node+$saAttr) -enable 1 ("AEspReticleLoc"+$saAttr);
+            attrFieldGrp -edit -attribute ($node+$stAttr) -enable 1 ("AEspReticleLoc"+$stAttr);
             break;
     }
 
@@ -308,30 +308,30 @@ global proc AEspReticuleLocSetFilmback( string $node, string $setting )
     }
 }
 
-global proc AEspReticuleLocUpdateFilmback( string $node )
+global proc AEspReticleLocUpdateFilmback( string $node )
 {
-    string $optionMenu = "AEspReticuleLocCameraPresets";
+    string $optionMenu = "AEspReticleLocCameraPresets";
 
     if (!`optionMenuGrp -exists $optionMenu`)
     {
-        AEspReticuleLocDrawFilmback( $node );
+        AEspReticleLocDrawFilmback( $node );
         return;
     }
 
-    optionMenuGrp -edit -cc ("AEspReticuleLocSetFilmback(\""+$node+"\",\"#1\")") $optionMenu;
+    optionMenuGrp -edit -cc ("AEspReticleLocSetFilmback(\""+$node+"\",\"#1\")") $optionMenu;
     getFilmback($node);
 }
 
-global proc AEspReticuleLocDrawFilmback( string $node )
+global proc AEspReticleLocDrawFilmback( string $node )
 {
-    string $optionMenu = "AEspReticuleLocCameraPresets";
+    string $optionMenu = "AEspReticleLocCameraPresets";
     string $attr  = "filmbackAperture";
     string $lAttr = "lensSqueezeRatio";
     string $sAttr = "soundTrackWidth";
     string $saAttr = "safeAction";
     string $stAttr = "safeTitle";
 
-    optionMenuGrp -l "Filmback Presets" -cc ("AEspReticuleLocSetFilmback(\""+$node+"\",\"#1\")") $optionMenu;
+    optionMenuGrp -l "Filmback Presets" -cc ("AEspReticleLocSetFilmback(\""+$node+"\",\"#1\")") $optionMenu;
     menuItem -label "Full Aperture";
     menuItem -label "Academy Aperture";
     menuItem -label "Sony Full Aperture";
@@ -340,10 +340,10 @@ global proc AEspReticuleLocDrawFilmback( string $node )
     menuItem -label "Use Camera Aperture";
     menuItem -label "User Defined";
         
-    attrFieldGrp -label "Filmback Aperture" -attribute ($node+$attr) ("AEspReticuleLoc"+$attr);
-    attrControlGrp -attribute ($node+$sAttr) ("AEspReticuleLoc"+$sAttr);
-    attrFieldGrp -label "Safe Action Area" -attribute ($node+$saAttr) ("AEspReticuleLoc"+$saAttr);
-    attrFieldGrp -label "Safe Title Area" -attribute ($node+$stAttr) ("AEspReticuleLoc"+$stAttr);
+    attrFieldGrp -label "Filmback Aperture" -attribute ($node+$attr) ("AEspReticleLoc"+$attr);
+    attrControlGrp -attribute ($node+$sAttr) ("AEspReticleLoc"+$sAttr);
+    attrFieldGrp -label "Safe Action Area" -attribute ($node+$saAttr) ("AEspReticleLoc"+$saAttr);
+    attrFieldGrp -label "Safe Title Area" -attribute ($node+$stAttr) ("AEspReticleLoc"+$stAttr);
 
     getFilmback($node);
 }
@@ -351,7 +351,7 @@ global proc AEspReticuleLocDrawFilmback( string $node )
 proc getProjection( string $node )
 {
     string $attr = "projectionGate";
-    string $optionMenu = "AEspReticuleLocProjectionPresets";
+    string $optionMenu = "AEspReticleLocProjectionPresets";
 
     float $projGate[] = `getAttr ($node+$attr)`;
     $projGate[0] = precision($projGate[0],3);
@@ -360,39 +360,39 @@ proc getProjection( string $node )
     if ($projGate[0] == 0.825 && $projGate[1] == 0.446)
     {
         optionMenuGrp -edit -select 1 $optionMenu;
-        AEspReticuleLocSetProjection($node,"1.85 Projection");
+        AEspReticleLocSetProjection($node,"1.85 Projection");
         return;
     }
     if ($projGate[0] == 0.825 && $projGate[1] == 0.471)
     {
         optionMenuGrp -edit -select 2 $optionMenu;
-        AEspReticuleLocSetProjection($node,"1.75 Projection");
+        AEspReticleLocSetProjection($node,"1.75 Projection");
         return;
     }
     if ($projGate[0] == 0.825 && $projGate[1] == 0.497)
     {
         optionMenuGrp -edit -select 3 $optionMenu;
-        AEspReticuleLocSetProjection($node,"1.66 Projection");
+        AEspReticleLocSetProjection($node,"1.66 Projection");
         return;
     }
     if ($projGate[0] == 0.825 && $projGate[1] == 0.602)
     {
         optionMenuGrp -edit -select 4 $optionMenu;
-        AEspReticuleLocSetProjection($node,"1.37 Projection");
+        AEspReticleLocSetProjection($node,"1.37 Projection");
         return;
     }
     if ($projGate[0] == 0.825 && $projGate[1] == 0.690)
     {
         optionMenuGrp -edit -select 5 $optionMenu;
-        AEspReticuleLocSetProjection($node,"2.39 Anamorphic");
+        AEspReticleLocSetProjection($node,"2.39 Anamorphic");
         return;
     }
 
-    AEspReticuleLocSetProjection($node,"User Defined");
+    AEspReticleLocSetProjection($node,"User Defined");
     optionMenuGrp -edit -select 6 $optionMenu;
 }
 
-global proc AEspReticuleLocSetProjection( string $node, string $setting )
+global proc AEspReticleLocSetProjection( string $node, string $setting )
 {
     string $attr = "projectionGate";
     string $paAttr = "projectionAspect";
@@ -401,76 +401,76 @@ global proc AEspReticuleLocSetProjection( string $node, string $setting )
     {
         case "1.85 Projection" :
             setAttr ($node+$attr) 0.825 0.446;
-            floatFieldGrp -edit -enable 0 ("AEspReticuleLoc"+$attr);
-            floatFieldGrp -edit -enable 0 ("AEspReticuleLoc"+$paAttr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$paAttr);
             break;
         case "1.75 Projection" :
             setAttr ($node+$attr) 0.825 0.471;
-            floatFieldGrp -edit -enable 0 ("AEspReticuleLoc"+$attr);
-            floatFieldGrp -edit -enable 0 ("AEspReticuleLoc"+$paAttr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$paAttr);
             break;
         case "1.66 Projection" :
             setAttr ($node+$attr) 0.825 0.497;
-            floatFieldGrp -edit -enable 0 ("AEspReticuleLoc"+$attr);
-            floatFieldGrp -edit -enable 0 ("AEspReticuleLoc"+$paAttr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$paAttr);
             break;
         case "1.37 Projection" :
             setAttr ($node+$attr) 0.825 0.602;
-            floatFieldGrp -edit -enable 0 ("AEspReticuleLoc"+$attr);
-            floatFieldGrp -edit -enable 0 ("AEspReticuleLoc"+$paAttr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$paAttr);
             break;
         case "2.39 Anamorphic" :
             setAttr ($node+$attr) 0.825 0.690;
-            floatFieldGrp -edit -enable 0 ("AEspReticuleLoc"+$attr);
-            floatFieldGrp -edit -enable 0 ("AEspReticuleLoc"+$paAttr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 0 ("AEspReticleLoc"+$paAttr);
             break;
         case "User Defined" :
-            floatFieldGrp -edit -enable 1 ("AEspReticuleLoc"+$attr);
-            floatFieldGrp -edit -enable 1 ("AEspReticuleLoc"+$paAttr);
+            floatFieldGrp -edit -enable 1 ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -enable 1 ("AEspReticleLoc"+$paAttr);
             break;
         case "projGate" :
             break;
         case "projAR" :
-            float $projGate[] = `floatFieldGrp -query -value ("AEspReticuleLoc"+$attr)`;
-            float $projAR[] = `floatFieldGrp -query -value ("AEspReticuleLoc"+$paAttr)`;
+            float $projGate[] = `floatFieldGrp -query -value ("AEspReticleLoc"+$attr)`;
+            float $projAR[] = `floatFieldGrp -query -value ("AEspReticleLoc"+$paAttr)`;
             $projGate[0] = precision($projGate[0],3);
             $projGate[1] = precision($projGate[0]/$projAR[0],3);
-            foatFieldGrp -edit -value2 $projGate[1] ("AEspReticuleLoc"+$attr);
+            foatFieldGrp -edit -value2 $projGate[1] ("AEspReticleLoc"+$attr);
             return;
     }
 
-    float $projGate[] = `floatFieldGrp -query -value ("AEspReticuleLoc"+$attr)`;
+    float $projGate[] = `floatFieldGrp -query -value ("AEspReticleLoc"+$attr)`;
     float $ar = precision($projGate[0]/$projGate[1],3);
-    floatFieldGrp -edit -value1 $ar ("AEspReticuleLoc"+$paAttr);
+    floatFieldGrp -edit -value1 $ar ("AEspReticleLoc"+$paAttr);
 }
 
-global proc AEspReticuleLocUpdateProjection ( string $attr, string $node )
+global proc AEspReticleLocUpdateProjection ( string $attr, string $node )
 {
-    string $optionMenu = "AEspReticuleLocProjectionPresets";
+    string $optionMenu = "AEspReticleLocProjectionPresets";
     $attr = "projectionGate";
     string $paAttr = "projectionAspect";
 
     if (!`optionMenuGrp -exists $optionMenu`)
     {
-        AEspReticuleLocDrawProjection( $attr, $node );
+        AEspReticleLocDrawProjection( $attr, $node );
         return;
     }
 
-    optionMenuGrp -edit -cc ("AEspReticuleLocSetProjection(\""+$node+"\",\"#1\")") $optionMenu;
-    floatFieldGrp -edit -cc ("AEspReticuleLocSetProjection(\""+$node+"\",\"projGate\")") ("AEspReticuleLoc"+$attr);
-    connectControl -index 2 ("AEspReticuleLoc"+$attr) ($node+"horizontalProjectionGate");
-    connectControl -index 3 ("AEspReticuleLoc"+$attr) ($node+"verticalProjectionGate");
-    floatFieldGrp -edit -cc ("AEspReticuleLocSetProjection(\""+$node+"\",\"projAR\")")   ("AEspReticuleLoc"+$paAttr);
+    optionMenuGrp -edit -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"#1\")") $optionMenu;
+    floatFieldGrp -edit -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"projGate\")") ("AEspReticleLoc"+$attr);
+    connectControl -index 2 ("AEspReticleLoc"+$attr) ($node+"horizontalProjectionGate");
+    connectControl -index 3 ("AEspReticleLoc"+$attr) ($node+"verticalProjectionGate");
+    floatFieldGrp -edit -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"projAR\")")   ("AEspReticleLoc"+$paAttr);
     getProjection($node);
 }
 
-global proc AEspReticuleLocDrawProjection( string $attr, string $node )
+global proc AEspReticleLocDrawProjection( string $attr, string $node )
 {
-    string $optionMenu = "AEspReticuleLocProjectionPresets";
+    string $optionMenu = "AEspReticleLocProjectionPresets";
     $attr = "projectionGate";
     string $paAttr = "projectionAspect";
 
-    optionMenuGrp -l "Proj. Presets" -cc ("AEspReticuleLocSetProjection(\""+$node+"\",\"#1\")") $optionMenu;
+    optionMenuGrp -l "Proj. Presets" -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"#1\")") $optionMenu;
     menuItem -label "1.85 Projection";
     menuItem -label "1.75 Projection";
     menuItem -label "1.66 Projection";
@@ -478,16 +478,16 @@ global proc AEspReticuleLocDrawProjection( string $attr, string $node )
     menuItem -label "2.39 Anamorphic";
     menuItem -label "User Defined";
         
-    floatFieldGrp -label "Proj. Aperture" -nf 2 -pre 3 -cc ("AEspReticuleLocSetProjection(\""+$node+"\",\"projGate\")") ("AEspReticuleLoc"+$attr);
-    connectControl -index 2 ("AEspReticuleLoc"+$attr) ($node+"horizontalProjectionGate");
-    connectControl -index 3 ("AEspReticuleLoc"+$attr) ($node+"verticalProjectionGate");
-    floatFieldGrp -label "Proj. Aspect Ratio" -nf 1 -pre 3 -cc ("AEspReticuleLocSetProjection(\""+$node+"\",\"projAR\")") ("AEspReticuleLoc"+$paAttr);
+    floatFieldGrp -label "Proj. Aperture" -nf 2 -pre 3 -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"projGate\")") ("AEspReticleLoc"+$attr);
+    connectControl -index 2 ("AEspReticleLoc"+$attr) ($node+"horizontalProjectionGate");
+    connectControl -index 3 ("AEspReticleLoc"+$attr) ($node+"verticalProjectionGate");
+    floatFieldGrp -label "Proj. Aspect Ratio" -nf 1 -pre 3 -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"projAR\")") ("AEspReticleLoc"+$paAttr);
     getProjection($node);
 }
 
-global proc AEspReticuleLocDrawAspectRatios( string $attr )
+global proc AEspReticleLocDrawAspectRatios( string $attr )
 {
-    string $frameLayout = "AEspReticuleLocAspectRatios";
+    string $frameLayout = "AEspReticleLocAspectRatios";
     if (`frameLayout -ex $frameLayout`)
     {
         deleteUI $frameLayout;
@@ -500,20 +500,20 @@ global proc AEspReticuleLocDrawAspectRatios( string $attr )
     for ($i = 0; $i < $numARs; $i++)
     {
         float $aspectRatio = spSprintf("%1.2f",`getAttr ($attr+"["+$i+"].aspectRatio")`);
-        string $fl = `frameLayout -label $aspectRatio ("AEspReticuleLocFL"+$i)`;
+        string $fl = `frameLayout -label $aspectRatio ("AEspReticleLocFL"+$i)`;
         columnLayout ($fl+"CL");
         drawAspectRatio( ($attr+"["+$i+"]") , $fl);
         setParent ..;
         setParent ..;
     }
-    button -label "add new aspect ratio" -command ("AEspReticuleLocNewAspectRatio(\""+$attr+"\",\""+$numARs+"\");");
+    button -label "add new aspect ratio" -command ("AEspReticleLocNewAspectRatio(\""+$attr+"\",\""+$numARs+"\");");
 }
 
-global proc AEspReticuleLocDrawText( string $attr )
+global proc AEspReticleLocDrawText( string $attr )
 {
     string $textTypes[] = {"String","Lens","Frame Number","Aspect Ratio","Max. Distance","Proj. Gate"};
 
-    string $frameLayout = "AEspReticuleLocText";
+    string $frameLayout = "AEspReticleLocText";
     if (`frameLayout -ex $frameLayout`)
     {
         deleteUI $frameLayout;
@@ -534,13 +534,13 @@ global proc AEspReticuleLocDrawText( string $attr )
             if (size($str) > 0)
                 $label += " - " + $str;
         }
-        string $fl = `frameLayout -label ($label) ("AEspReticuleLocFL"+$i)`;
+        string $fl = `frameLayout -label ($label) ("AEspReticleLocFL"+$i)`;
         columnLayout ($fl+"CL");
         drawText( ($attr+"["+$i+"]") , $fl, $i);
         setParent ..;
         setParent ..;
     }
-    button -label "add new text" -command ("AEspReticuleLocNewText(\""+$attr+"\",\""+$numText+"\");");
+    button -label "add new text" -command ("AEspReticleLocNewText(\""+$attr+"\",\""+$numText+"\");");
 }
 
 proc excludeAttributes()
@@ -620,7 +620,7 @@ proc excludeAttributes()
     editorTemplate -endNoOptimize;
 }
 
-global proc AEspReticuleLocTemplate( string $nodeName )
+global proc AEspReticleLocTemplate( string $nodeName )
 {
     AEswatchDisplay $nodeName;
     editorTemplate -beginScrollLayout;
@@ -632,7 +632,7 @@ global proc AEspReticuleLocTemplate( string $nodeName )
 
     editorTemplate -beginLayout "Filmback Attributes" -collapse 1;
         editorTemplate -addControl "displayFilmGate";
-        editorTemplate -callCustom "AEspReticuleLocDrawFilmback" "AEspReticuleLocUpdateFilmback" "";
+        editorTemplate -callCustom "AEspReticleLocDrawFilmback" "AEspReticleLocUpdateFilmback" "";
         editorTemplate -addControl "filmGateColor";
         editorTemplate -addControl "filmGateTrans";
         editorTemplate -beginNoOptimize;
@@ -642,7 +642,7 @@ global proc AEspReticuleLocTemplate( string $nodeName )
     editorTemplate -endLayout;
     editorTemplate -beginLayout "Projection Gate Attributes" -collapse 1;
         editorTemplate -addControl "displayProjGate";
-        editorTemplate -callCustom "AEspReticuleLocDrawProjection" "AEspReticuleLocUpdateProjection" "projectionGate" "";
+        editorTemplate -callCustom "AEspReticleLocDrawProjection" "AEspReticleLocUpdateProjection" "projectionGate" "";
         editorTemplate -addControl "projGateColor";
         editorTemplate -addControl "projGateTrans";
     editorTemplate -endLayout;
@@ -669,8 +669,8 @@ global proc AEspReticuleLocTemplate( string $nodeName )
         editorTemplate -label "Line Color" -addControl "padLineColor";
         editorTemplate -label "Line Transp." -addControl "padLineTrans";
     editorTemplate -endLayout;
-    editorTemplate -callCustom "AEspReticuleLocDrawAspectRatios" "AEspReticuleLocDrawAspectRatios" "aspectRatios";
-    editorTemplate -callCustom "AEspReticuleLocDrawText" "AEspReticuleLocDrawText" "text";
+    editorTemplate -callCustom "AEspReticleLocDrawAspectRatios" "AEspReticleLocDrawAspectRatios" "aspectRatios";
+    editorTemplate -callCustom "AEspReticleLocDrawText" "AEspReticleLocDrawText" "text";
     editorTemplate -beginLayout "Options" -collapse 1;
         editorTemplate -label "Text Color" -addControl "miscTextColor";
         editorTemplate -label "Text Transp." -addControl "miscTextTrans";
@@ -687,7 +687,7 @@ global proc AEspReticuleLocTemplate( string $nodeName )
         editorTemplate -addControl "displayAspectText";
         editorTemplate -addSeparator;
         editorTemplate -addControl "hideLocator";
-        editorTemplate -addControl "useSpReticule";
+        editorTemplate -addControl "useSpReticle";
         editorTemplate -addControl "driveCameraAperture";
         editorTemplate -addControl "useOverscan";
         editorTemplate -addControl "maximumDistance";
