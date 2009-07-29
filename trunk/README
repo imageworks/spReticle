@@ -1,0 +1,6 @@
+This is how to compile for 64 bit Maya on Linux using g++.  For other
+architectures and compilers, modify Makefile.os accordingly. 
+Put the actual path of your Maya install directory for MAYA_LOCATION:
+
+make MAYA_LOCATION=/net/apps/rhel40m64/aw/maya8.5
+
