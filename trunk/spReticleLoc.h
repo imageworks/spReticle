@@ -30,11 +30,11 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ///////////////////////////////////////////////////////////////////////////////
 
-class spReticuleLoc : public MPxLocatorNode
+class spReticleLoc : public MPxLocatorNode
 {
 public:
-    spReticuleLoc();
-    virtual                 ~spReticuleLoc();
+    spReticleLoc();
+    virtual                 ~spReticleLoc();
 
     virtual void            draw( M3dView & view, const MDagPath & path, 
                             M3dView::DisplayStyle style,
@@ -100,7 +100,7 @@ public:
     static MObject ProjGateColor;
     static MObject ProjGateTrans;
     static MObject HideLocator;
-    static MObject UseSpReticule;
+    static MObject UseSpReticle;
     static MObject DisplayLineH;
     static MObject DisplayLineV;
     static MObject DisplayThirdsH;
