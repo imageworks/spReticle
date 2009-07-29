@@ -1,11 +1,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 // Copyright (c) 2009, Sony Pictures Imageworks
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 // Redistributions of source code must retain the above copyright notice,
 // this list of conditions and the following disclaimer.
 // Redistributions in binary form must reproduce the above copyright
@@ -36,11 +36,11 @@ public:
     spReticleLoc();
     virtual                 ~spReticleLoc();
 
-    virtual void            draw( M3dView & view, const MDagPath & path, 
+    virtual void            draw( M3dView & view, const MDagPath & path,
                             M3dView::DisplayStyle style,
                             M3dView::DisplayStatus status );
 
-    virtual bool            setInternalValueInContext( const MPlug &, 
+    virtual bool            setInternalValueInContext( const MPlug &,
                                                        const MDataHandle &,
                                                        MDGContext &);
 
@@ -157,20 +157,20 @@ private:
             int    displayMode;
             bool   displaySafeAction;
             bool   displaySafeTitle;
-            
+
             Geom   aspectGeom;
             Geom   safeActionGeom;
             Geom   safeTitleGeom;
     };
 
-    class PanScan : public Aspect_Ratio 
+    class PanScan : public Aspect_Ratio
     {
         public:
             double panScanRatio;
             double panScanOffset;
     };
 
-    class Filmback 
+    class Filmback
     {
         public:
             double horizontalFilmAperture;
@@ -188,7 +188,7 @@ private:
             double displayProjGate;
             bool   displaySafeAction;
             bool   displaySafeTitle;
-            
+
             Geom   filmbackGeom;
             Geom   imageGeom;
             Geom   projGeom;
@@ -204,7 +204,7 @@ private:
             double padAmountX;
             double padAmountY;
             int    displayMode;
-            
+
             Geom   padGeom;
     };
 

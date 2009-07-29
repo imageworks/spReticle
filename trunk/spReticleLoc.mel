@@ -1,11 +1,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 // Copyright (c) 2009, Sony Pictures Imageworks
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 // Redistributions of source code must retain the above copyright notice,
 // this list of conditions and the following disclaimer.
 // Redistributions in binary form must reproduce the above copyright
@@ -42,12 +42,12 @@ global proc spReticleLocCreate()
         string $reticleTransform = `createNode -n reticle transform`;
         createNode -n reticleShape -p $reticleTransform spReticleLoc;
 
-        if (objExists("temp_master")) 
+        if (objExists("temp_master"))
         {
             parent $reticleTransform temp_master;
         }
     }
-    else 
+    else
     {
         setAttr ($reticleLoc[0]+".drawingEnabled") 1;
     }
@@ -63,7 +63,7 @@ global proc spReticleLocSetDefault(string $node, string $tag)
 
         // Turn on projection mask
         setAttr ($node+".displayProjGate") 1;
-        
+
         // Set reticle to template mode
         setAttr ($node+".template") 1;
     }

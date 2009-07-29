@@ -1,11 +1,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 // Copyright (c) 2009, Sony Pictures Imageworks
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 // Redistributions of source code must retain the above copyright notice,
 // this list of conditions and the following disclaimer.
 // Redistributions in binary form must reproduce the above copyright
@@ -34,12 +34,12 @@
 /*
  * @file  spReticleLoc.cpp
  * This plug-in creates a custom locator to display a customizable reticle.
- * The reticle has the ability to display any number of aspect ratios as 
- * well as pan-and-scan, projection masks, filmback data, etc. The look of 
- * the reticle is customizable in regards to color and transparency for 
- * masks, lines and text.There is also an option to specify whether the 
- * reticle should respect the show/hide locator display options. Finally, 
- * the reticle can be filtered to only display on cameras which contain 
+ * The reticle has the ability to display any number of aspect ratios as
+ * well as pan-and-scan, projection masks, filmback data, etc. The look of
+ * the reticle is customizable in regards to color and transparency for
+ * masks, lines and text.There is also an option to specify whether the
+ * reticle should respect the show/hide locator display options. Finally,
+ * the reticle can be filtered to only display on cameras which contain
  * the attribute useSpReticle, set to true.
  */
 
@@ -189,7 +189,7 @@ MPoint spReticleLoc::getPoint(float x, float y, M3dView & view)
     return p;
 }
 
-// This method will retrieve the individual r,g,b and alpha values from 
+// This method will retrieve the individual r,g,b and alpha values from
 // various plugs and store them in an MColor object.
 //
 MStatus spReticleLoc::getColor(MObject colorObj, MObject transObj, MColor & color)
@@ -271,7 +271,7 @@ MMatrix spReticleLoc::getMatrix(MString matrixStr)
     }
 
     matrix = matrixData.matrix( &stat );
-    if (!stat) 
+    if (!stat)
     {
         stat.perror("spReticleLoc::getMatrix getting matrix");
         return matrix.identity;
@@ -280,7 +280,7 @@ MMatrix spReticleLoc::getMatrix(MString matrixStr)
     return matrix;
 }
 
-// This method outputs to cerr the attributes of an Aspect_Ratio 
+// This method outputs to cerr the attributes of an Aspect_Ratio
 // class instance.
 //
 void spReticleLoc::printAspectRatio(Aspect_Ratio & ar)
@@ -368,7 +368,7 @@ MStatus spReticleLoc::getPadData()
     // Get the padAmountY attribute;
     p = MPlug ( thisNode, PadAmountY );
     McheckStatus ( p.getValue ( pad.padAmountY  ), "spReticleLoc::getPadData padAmountX");
-        
+
     // Set whether the filmback is padded
     pad.isPadded = (pad.padAmountX != 0 && pad.padAmountY != 0);
 
@@ -377,7 +377,7 @@ MStatus spReticleLoc::getPadData()
         // Get the pad display mode
         p = MPlug ( thisNode, PadDisplayMode );
         McheckStatus ( p.getValue ( pad.displayMode ), "spReticleLoc::getPadData padDisplayMode");
-        
+
         // Get the pad mask color
         stat = getColor( PadMaskColor, PadMaskTrans, pad.padGeom.maskColor );
         McheckStatus ( stat, "spReticleLoc::getPadData get padMaskColor");
@@ -390,7 +390,7 @@ MStatus spReticleLoc::getPadData()
     return MS::kSuccess;
 }
 
-// This method retrieves all of the data related to the filmback from 
+// This method retrieves all of the data related to the filmback from
 // various plugs.
 //
 MStatus spReticleLoc::getFilmbackData()
@@ -421,8 +421,8 @@ MStatus spReticleLoc::getFilmbackData()
     return MS::kSuccess;
 }
 
-// This method retrieves all of the data related to the projection mask from 
-// various plugs and then calls calcProjGeom to calculate the various 
+// This method retrieves all of the data related to the projection mask from
+// various plugs and then calls calcProjGeom to calculate the various
 // projection geometry instances.
 //
 MStatus spReticleLoc::getProjectionData()
@@ -508,7 +508,7 @@ MStatus spReticleLoc::getAspectRatioChildren(MPlug arPlug, Aspect_Ratio & ar)
 {
     MStatus stat;
     MPlug p, c;
-            
+
     p = arPlug.child( 0 , &stat );
     McheckStatus( p.getValue( ar.aspectRatio ), "spReticleLoc::getAspectRatioChildren - aspectRatio" );
 
@@ -520,7 +520,7 @@ MStatus spReticleLoc::getAspectRatioChildren(MPlug arPlug, Aspect_Ratio & ar)
         p = arPlug.child( 2 , &stat );
         c = p.child( 0, &stat );
         McheckStatus( c.getValue( ar.aspectGeom.maskColor.r ), "spReticleLoc::getAspectRatioChildren - aspectMaskColorR" );
-        
+
         c = p.child( 1, &stat );
         McheckStatus( c.getValue( ar.aspectGeom.maskColor.g ), "spReticleLoc::getAspectRatioChildren - aspectMaskColorG" );
 
@@ -529,11 +529,11 @@ MStatus spReticleLoc::getAspectRatioChildren(MPlug arPlug, Aspect_Ratio & ar)
 
         p = arPlug.child( 3 , &stat );
         McheckStatus( p.getValue( ar.aspectGeom.maskColor.a ), "spReticleLoc::getAspectRatioChildren - aspectMaskTrans" );
-        
+
         p = arPlug.child( 4 , &stat );
         c = p.child( 0, &stat );
         McheckStatus( c.getValue( ar.aspectGeom.lineColor.r ), "spReticleLoc::getAspectRatioChildren - aspectLineColorR" );
-        
+
         c = p.child( 1, &stat );
         McheckStatus( c.getValue( ar.aspectGeom.lineColor.g ), "spReticleLoc::getAspectRatioChildren - aspectLineColorG" );
 
@@ -550,7 +550,7 @@ MStatus spReticleLoc::getAspectRatioChildren(MPlug arPlug, Aspect_Ratio & ar)
         McheckStatus( p.getValue( ar.displaySafeTitle ), "spReticleLoc::getAspectRatioChildren - displaySafeTitle" );
     }
 
-    return MS::kSuccess;	
+    return MS::kSuccess;
 }
 
 bool spReticleLoc::aspectRatioSortPredicate(const Aspect_Ratio & lhs,
@@ -576,11 +576,11 @@ MStatus spReticleLoc::getAspectRatioData()
     {
         MPlug p = arsPlug.elementByPhysicalIndex( i, &stat );
         McheckStatus( stat, "spReticleLoc::getAspectRatioData - cannot get index" );
-        
+
         Aspect_Ratio ar;
         stat = getAspectRatioChildren( p, ar );
         McheckStatus( stat, "spReticleLoc::getAspectRatioData - cannot get children" );
-        
+
         //printAspectRatio( ar );
 
         ars.push_back( ar );
@@ -615,7 +615,7 @@ MStatus spReticleLoc::getPanScanData ( PanScan & ps )
 
         p = psPlug.child( 8 , &stat );
         McheckStatus( p.getValue( ps.panScanRatio ), "spReticleLoc::getPanScanData - panScanRatio" );
-        
+
         p = psPlug.child( 9 , &stat );
         McheckStatus( p.getValue( ps.panScanOffset ), "spReticleLoc::getPanScanData - panScanOffset" );
     }
@@ -625,7 +625,7 @@ MStatus spReticleLoc::getPanScanData ( PanScan & ps )
     return MS::kSuccess;
 }
 
-// This method gets the data for a specified text entry. The text attribute 
+// This method gets the data for a specified text entry. The text attribute
 // is a complex compound attribute where each index is the data for a specific
 // text element.
 //
@@ -633,7 +633,7 @@ MStatus spReticleLoc::getTextChildren(MPlug tPlug, TextData & td)
 {
     MStatus stat;
     MPlug p, c;
-            
+
     p = tPlug.child( 0 , &stat );
     McheckStatus( p.getValue( td.textType ), "spReticleLoc::getTextChildren - textType" );
 
@@ -646,13 +646,13 @@ MStatus spReticleLoc::getTextChildren(MPlug tPlug, TextData & td)
     p = tPlug.child( 3 , &stat );
     c = p.child( 0, &stat );
     McheckStatus( c.getValue( td.textPosX ), "spReticleLoc::getTextChildren - textPosX" );
-        
+
     c = p.child( 1, &stat );
     McheckStatus( c.getValue( td.textPosY ), "spReticleLoc::getTextChildren - textPosY" );
 
     p = tPlug.child( 4 , &stat );
     McheckStatus( p.getValue( td.textPosRel ), "spReticleLoc::getTextChildren - textPosRel" );
-        
+
     p = tPlug.child( 5 , &stat );
     McheckStatus( p.getValue( td.textLevel ), "spReticleLoc::getTextChildren - textLevel" );
 
@@ -671,8 +671,8 @@ MStatus spReticleLoc::getTextChildren(MPlug tPlug, TextData & td)
 
     p = tPlug.child( 8 , &stat );
     McheckStatus( p.getValue( td.textColor.a ), "spReticleLoc::getTextChildren - textTrans" );
-        
-    return MS::kSuccess;	
+
+    return MS::kSuccess;
 }
 
 MStatus spReticleLoc::getTextData()
@@ -689,15 +689,15 @@ MStatus spReticleLoc::getTextData()
     for (int i = 0; i < numPlugs && i < 10; i++ )
     {
         TextData td;
-        
+
         tp = p.elementByPhysicalIndex( i, &stat );
         McheckStatus( stat, "spReticleLoc::getTextData - cannot get index" );
-        
+
         stat = getTextChildren( tp, td );
         McheckStatus( stat, "spReticleLoc::getTextData - cannot get children" );
 
         //printText( td );
-        
+
         text.push_back( td );
     }
 
@@ -727,7 +727,7 @@ MStatus spReticleLoc::getOptions()
         // on the camera;
         p = MPlug ( thisNode, UseSpReticle );
         McheckStatus ( p.getValue ( options.useSpRet  ), "spReticleLoc::getOptions useSpReticle");
-        
+
         // Display horizontal line option;
         p = MPlug ( thisNode, DisplayLineH );
         McheckStatus ( p.getValue ( options.displayLineH  ), "spReticleLoc::getOptions displayLineH");
@@ -747,11 +747,11 @@ MStatus spReticleLoc::getOptions()
         // Display crosshair option;
         p = MPlug ( thisNode, DisplayCrosshair );
         McheckStatus ( p.getValue ( options.displayCrosshair  ), "spReticleLoc::getOptions displayCrosshair");
-        
+
         // Text Color;
         stat = getColor (MiscTextColor, MiscTextTrans, options.textColor );
         McheckStatus ( stat, "spReticleLoc::getOptions textColor");
-        
+
         // Line Color;
         stat = getColor ( LineColor, LineTrans, options.lineColor );
         McheckStatus ( stat, "spReticleLoc::getOptions lineColor");
@@ -868,7 +868,7 @@ void spReticleLoc::calcFilmbackGeom()
                 pad.padGeom.y = pad.padGeom.x / aspectRatio;
                 filmback.filmbackGeom.x /= hfa / filmback.horizontalFilmAperture;
             }
-            
+
             filmback.filmbackGeom.y = filmback.filmbackGeom.x / nonPaddedAspectRatio;
             break;
         case MFnCamera::kVerticalFilmFit :
@@ -877,10 +877,10 @@ void spReticleLoc::calcFilmbackGeom()
             {
                 pad.padGeom.y = filmback.filmbackGeom.y;
                 pad.padGeom.x = pad.padGeom.y * aspectRatio;
-                
+
                 filmback.filmbackGeom.y /= vfa / filmback.verticalFilmAperture;
             }
-            
+
             filmback.filmbackGeom.x = filmback.filmbackGeom.y * nonPaddedAspectRatio;
             break;
         default:
@@ -1045,7 +1045,7 @@ void spReticleLoc::calcPanScanGeom( PanScan & ps )
         calcSafeTitleGeom( ps );
 }
 
-bool spReticleLoc::setInternalValueInContext(const  MPlug & plug, 
+bool spReticleLoc::setInternalValueInContext(const  MPlug & plug,
         const MDataHandle & dataHandle,  MDGContext & ctx)
 {
     if (plug == worldInverseMatrix || plug == isTemplated)
@@ -1069,19 +1069,19 @@ void spReticleLoc::drawMask( Geom g1, Geom g2, MColor color, bool sides )
     glBegin( GL_QUADS );
 
         glColor4f( color.r, color.g, color.b, 1-color.a );
-            
+
         // Bottom Mask
         glVertex3d( g1.x1, g1.y1, z );
         glVertex3d( g1.x2, g1.y1, z );
         glVertex3d( g2.x2, g2.y1, z );
         glVertex3d( g2.x1, g2.y1, z );
-            
+
         // Top Mask
         glVertex3d( g2.x1, g2.y2, z );
         glVertex3d( g2.x2, g2.y2, z );
         glVertex3d( g1.x2, g1.y2, z );
         glVertex3d( g1.x1, g1.y2, z );
-            
+
         if (sides)
         {
             // Left side mask
@@ -1089,14 +1089,14 @@ void spReticleLoc::drawMask( Geom g1, Geom g2, MColor color, bool sides )
             glVertex3d( g2.x1, g2.y1, z );
             glVertex3d( g2.x1, g2.y2, z );
             glVertex3d( g1.x1, g1.y2, z );
-                
+
             // right side mask
             glVertex3d( g2.x2, g2.y1, z );
             glVertex3d( g1.x2, g1.y1, z );
             glVertex3d( g1.x2, g1.y2, z );
             glVertex3d( g2.x2, g2.y2, z );
         }
-        
+
     glEnd();
 
     // Turn on z-depth test
@@ -1106,7 +1106,7 @@ void spReticleLoc::drawMask( Geom g1, Geom g2, MColor color, bool sides )
 
 // This draws a single line between the specified points.
 //
-void spReticleLoc::drawLine(double x1, double x2, double y1, double y2, 
+void spReticleLoc::drawLine(double x1, double x2, double y1, double y2,
                              MColor color, bool stipple)
 {
     double z = -ncp;
@@ -1124,10 +1124,10 @@ void spReticleLoc::drawLine(double x1, double x2, double y1, double y2,
     glBegin( GL_LINES );
 
         glColor4f( color.r, color.g, color.b, 1-color.a );
-            
+
         glVertex3d( x1, y1, z );
         glVertex3d( x2, y2, z );
-                
+
     glEnd();
 
     if (stipple)
@@ -1162,15 +1162,15 @@ void spReticleLoc::drawLines( Geom g, MColor color, bool sides, bool stipple)
     glBegin( mode );
 
         glColor4f( color.r, color.g, color.b, 1-color.a );
-            
+
         glVertex3d( g.x1, g.y1, z );
         glVertex3d( g.x2, g.y1, z );
         glVertex3d( g.x2, g.y2, z );
         glVertex3d( g.x1, g.y2, z );
-                
+
     glEnd( );
 
-    if (stipple) 
+    if (stipple)
         glDisable (GL_LINE_STIPPLE);
 
     //Turn on z-depth test
@@ -1181,7 +1181,7 @@ void spReticleLoc::drawLines( Geom g, MColor color, bool sides, bool stipple)
 // This function uses Maya's built-in function to draw text. At somepoint
 // I hope to use glut or glFT to draw text.
 //
-void spReticleLoc::drawText(MString text, double tx, double ty, 
+void spReticleLoc::drawText(MString text, double tx, double ty,
                              MColor textColor, M3dView::TextPosition textAlign,
                              M3dView & view)
 {
@@ -1266,7 +1266,7 @@ void spReticleLoc::drawCustomTextElements(M3dView & view)
             case 5:						//Maximum Distance
                 if (options.maximumDistance <= 0)
                     continue;
-                
+
                 if (td.textStr == "")
                     td.textStr = MString("max. dist %1.0f");
 
@@ -1278,7 +1278,7 @@ void spReticleLoc::drawCustomTextElements(M3dView & view)
             {
                 if (!filmback.displayProjGate)
                     continue;
-                
+
                 double aspectRatio = (filmback.horizontalProjectionGate/filmback.verticalProjectionGate);
 
                 if (td.textStr == "")
@@ -1455,10 +1455,10 @@ void spReticleLoc::drawCustomTextElements(M3dView & view)
                         MGlobal::displayError( name() + " invalid aspect ratio level (" + td.textARLevel + ") for text item " + i);
                         continue;
                     }
-                    
+
                     if (!ars[level].aspectGeom.isValid)
                         continue;
-                    
+
                     switch (td.textType)
                     {
                         case 19:
@@ -1481,7 +1481,7 @@ void spReticleLoc::drawCustomTextElements(M3dView & view)
                 {
                     if (!panScan.aspectGeom.isValid)
                         calcPanScanGeom( panScan );
-                    
+
                     switch (td.textType)
                     {
                         case 19:
@@ -1504,10 +1504,10 @@ void spReticleLoc::drawCustomTextElements(M3dView & view)
                 MGlobal::displayError( name() + " invalid text anchor for text item " + i);
                 break;
         }
-        
+
         // Determine the position
         double x,y;
-        
+
         switch (td.textPosRel)
         {
             case 0:						//Bottom Left
@@ -1554,7 +1554,7 @@ void spReticleLoc::drawCustomTextElements(M3dView & view)
         // Add text position as offset
         x += td.textPosX;
         y += td.textPosY;
-        
+
         // Actually draw the text
         drawText( td.textStr, x, y, td.textColor, (M3dView::TextPosition)td.textAlign, view);
     }
@@ -1563,7 +1563,7 @@ void spReticleLoc::drawCustomTextElements(M3dView & view)
 // This is the main function which draws the locator. It is called
 // by Maya whenever a 3D view needs to be refreshed.
 //
-void spReticleLoc::draw(M3dView & view, const MDagPath & path, 
+void spReticleLoc::draw(M3dView & view, const MDagPath & path,
                          M3dView::DisplayStyle style,
                          M3dView::DisplayStatus status)
 {
@@ -1591,7 +1591,7 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
         getOptions();
 
     // Drawing not enabled, return
-    if ( !options.drawingEnabled ) 
+    if ( !options.drawingEnabled )
         return;
 
     // Get the dagPath, node and function set for the currently displaying camera
@@ -1618,7 +1618,7 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
         {
             McheckVoid ( useReticlePlug.getValue( useReticle ), "spReticleLoc::draw get useSpReticle plug");
         }
-         
+
         // If camera is not set to use reticle then return
         if ( !useReticle )
             return;
@@ -1675,20 +1675,20 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
     {
         // Get the pad attribute data
         getPadData();
-        
+
         // Get the filmback attribute data
         getFilmbackData();
-        
+
         // Get the projection gate attribute data
         getProjectionData();
-        
+
         // Get safe title and safe action data
         getSafeActionData();
         getSafeTitleData();
-        
+
         // Get pan and scan data
         getPanScanData( panScan );
-        
+
         // Hold this copy
         oFilmback = filmback;
 
@@ -1706,7 +1706,7 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
     // Calculate the safe action geometry
     if ( filmback.displaySafeAction )
         calcFilmbackSafeActionGeom();
-        
+
     // Calculate the safe title geometry
     if ( filmback.displaySafeTitle )
         calcFilmbackSafeTitleGeom();
@@ -1789,8 +1789,8 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
             Geom g = (i == 0)?aspectContainerGeom:ars[i-1].aspectGeom;
             MColor maskColor = ar.aspectGeom.maskColor;
             // Draw the mask in red if over the max distance
-            if (options.maximumDistance > 0 && 
-                fabs(maximumDist) >= options.maximumDistance) 
+            if (options.maximumDistance > 0 &&
+                fabs(maximumDist) >= options.maximumDistance)
             {
                 if (i == 0)
                 {
@@ -1800,7 +1800,7 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
                 {
                     maskColor *= MColor(1.5,0.5,0.5,1);
                 }
-            }	
+            }
             //drawMask(g, ar.aspectGeom, maskColor, (i == 0 && !(pad.usePad && pad.isPadded)) );
             drawMask(g, ar.aspectGeom, maskColor, i == 0);
         }
@@ -1828,7 +1828,7 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
     // Draw the panScan
     if ( panScan.displayMode != 0 )
     {
-        if (panScan.displayMode == 2) 
+        if (panScan.displayMode == 2)
             drawMask(ars[0].aspectGeom, panScan.aspectGeom, panScan.aspectGeom.maskColor, true );
         drawLines(panScan.aspectGeom, panScan.aspectGeom.lineColor, 1, 0);
 
@@ -1850,12 +1850,12 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
     {
         // Draw filmback
         drawLines(filmback.filmbackGeom, filmback.filmbackGeom.lineColor, 1, 0);
-        
+
         // Draw Sound Area Line
         if ( filmback.soundTrackWidth != 0 )
             drawLine(filmback.imageGeom.x1, filmback.imageGeom.x1, filmback.imageGeom.y1, filmback.imageGeom.y2, filmback.imageGeom.lineColor, 0 );
     }
-        
+
     // Draw filmback safe action
     if (filmback.displaySafeAction)
     {
@@ -1896,7 +1896,7 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
         drawLine( g.x1, g.x2, y1, y1, options.lineColor, 0 );
         drawLine( g.x1, g.x2, y2, y2, options.lineColor, 0 );
     }
-        
+
     // Display Vertical Thirds
     if ( options.displayThirdsV)
     {
@@ -1906,7 +1906,7 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
         drawLine( x1, x1, g.y1, g.y2, options.lineColor, 0 );
         drawLine( x2, x2, g.y1, g.y2, options.lineColor, 0 );
     }
-        
+
     // Display crosshair
     if ( options.displayCrosshair )
     {
@@ -1955,7 +1955,7 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
 // Make a huge bounding box
 //
 MBoundingBox spReticleLoc::boundingBox() const
-{   
+{
     return MBoundingBox(MPoint(-1000000,-1000000,-1000000),
                         MPoint(1000000,1000000,1000000));
 }
@@ -1965,7 +1965,7 @@ MBoundingBox spReticleLoc::boundingBox() const
 // option.
 //
 bool spReticleLoc::excludeAsLocator() const
-{ 
+{
     // Check to see locator should be hidden with other locators
     MObject thisNode = thisMObject();
     MPlug p(thisNode, HideLocator);
@@ -1977,11 +1977,11 @@ bool spReticleLoc::excludeAsLocator() const
     return hideLocator;
 }
 
-// This method is called just after a particular instance of the node has 
-// been created. It automatically sources the proper scripts and sets the 
-// loadDefault argument to 1, indicating that the first time the locator 
+// This method is called just after a particular instance of the node has
+// been created. It automatically sources the proper scripts and sets the
+// loadDefault argument to 1, indicating that the first time the locator
 // is drawn that it should first load the default settings for the locator.
-// This functionality allows either the show or facility to set standards 
+// This functionality allows either the show or facility to set standards
 // on the locator.
 //
 void spReticleLoc::postConstructor()
@@ -1989,8 +1989,8 @@ void spReticleLoc::postConstructor()
     // Tell Maya to draw this in the transparent queue
 #if MAYA_API_VERSION < 850
 #ifndef WIN32
-    setTranspHandler( (TranspHandler)(&spReticleLoc::isTransparent) ); 
-#endif 
+    setTranspHandler( (TranspHandler)(&spReticleLoc::isTransparent) );
+#endif
 #endif
     // Load defaults
     loadDefault = 1;
@@ -2005,7 +2005,7 @@ void * spReticleLoc::creator()
 }
 
 MStatus spReticleLoc::initialize()
-{ 
+{
     MStatus              stat;
     MFnNumericAttribute  nAttr;
     MFnEnumAttribute     eAttr;
@@ -2385,7 +2385,7 @@ MStatus spReticleLoc::initialize()
 
     Time = uAttr.create( "time", "tm", MFnUnitAttribute::kTime, 0.0, &stat );
     McheckStatus(stat,"create time attribute");
-        
+
     DriveCameraAperture = nAttr.create( "driveCameraAperture", "dca", MFnNumericData::kBoolean, false, &stat );
     McheckStatus(stat,"create driveCameraAperture attribute");
     nAttr.setInternal(true);
@@ -2485,7 +2485,7 @@ MStatus spReticleLoc::initialize()
     stat = addAttribute (AspectRatios);
         McheckStatus(stat,"addAttribute aspectRatios");
     stat = addAttribute (Text);
-        McheckStatus(stat,"addAttribute text");	
+        McheckStatus(stat,"addAttribute text");
     stat = addAttribute (MiscTextColor);
         McheckStatus(stat,"addAttribute miscTextColor");
     stat = addAttribute (MiscTextTrans);
@@ -2533,10 +2533,10 @@ MStatus spReticleLoc::initialize()
 }
 
 MStatus initializePlugin(MObject obj)
-{ 
+{
     MFnPlugin plugin(obj, "SPI", "1.6", "Any");
 
-    MStatus status = plugin.registerNode( "spReticleLoc", spReticleLoc::id, 
+    MStatus status = plugin.registerNode( "spReticleLoc", spReticleLoc::id,
                          &spReticleLoc::creator, &spReticleLoc::initialize,
                          MPxNode::kLocatorNode );
     if (!status)

@@ -1,11 +1,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 // Copyright (c) 2009, Sony Pictures Imageworks
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 // Redistributions of source code must retain the above copyright notice,
 // this list of conditions and the following disclaimer.
 // Redistributions in binary form must reproduce the above copyright
@@ -274,7 +274,7 @@ global proc AEspReticleLocSetFilmback( string $node, string $setting )
             break;
     }
 
-    if (($newHfa && $newVfa) && (($newHfa != $hfa) || 
+    if (($newHfa && $newVfa) && (($newHfa != $hfa) ||
         ($newVfa != $vfa)) && (about("-batch") == 0))
     {
         string $result = `confirmDialog -title "Update cameras?"
@@ -339,7 +339,7 @@ global proc AEspReticleLocDrawFilmback( string $node )
     menuItem -label "Show Filmback";
     menuItem -label "Use Camera Aperture";
     menuItem -label "User Defined";
-        
+
     attrFieldGrp -label "Filmback Aperture" -attribute ($node+$attr) ("AEspReticleLoc"+$attr);
     attrControlGrp -attribute ($node+$sAttr) ("AEspReticleLoc"+$sAttr);
     attrFieldGrp -label "Safe Action Area" -attribute ($node+$saAttr) ("AEspReticleLoc"+$saAttr);
@@ -477,7 +477,7 @@ global proc AEspReticleLocDrawProjection( string $attr, string $node )
     menuItem -label "1.37 Projection";
     menuItem -label "2.39 Anamorphic";
     menuItem -label "User Defined";
-        
+
     floatFieldGrp -label "Proj. Aperture" -nf 2 -pre 3 -cc ("AEspReticleLocSetProjection(\""+$node+"\",\"projGate\")") ("AEspReticleLoc"+$attr);
     connectControl -index 2 ("AEspReticleLoc"+$attr) ($node+"horizontalProjectionGate");
     connectControl -index 3 ("AEspReticleLoc"+$attr) ($node+"verticalProjectionGate");
@@ -526,7 +526,7 @@ global proc AEspReticleLocDrawText( string $attr )
     for ($i = 0; $i < $numText; $i++)
     {
         string $label = getAttr("-asString",($attr+"["+$i+"].textType"));
-        if ($label == "String") 
+        if ($label == "String")
         {
             string $str = getAttr($attr+"["+$i+"].textStr");
             if (size($str) > 15)
@@ -581,7 +581,7 @@ proc excludeAttributes()
         editorTemplate -suppress "depthJitter";
         editorTemplate -suppress "maxVisibilitySamplesOverride";
         editorTemplate -suppress "maxVisibilitySamples";
-        editorTemplate -suppress "boundingBoxScale"; 
+        editorTemplate -suppress "boundingBoxScale";
         editorTemplate -suppress "featureDisplacement";
         editorTemplate -suppress "initialSampleRate";
         editorTemplate -suppress "extraSampleRate";
