@@ -60,7 +60,7 @@ global proc AEspReticleLocNewAspectRatio(string $attr, int $index)
     $attr += "["+$index+"]";
     setAttr ($attr+".displayMode") 1;
 
-    if ($index != 0) setAttr ($attr+".maskColor") 1 1 1;
+    if ($index != 0) setAttr ($attr+".aspectMaskColor") 0 0 0;
 }
 
 proc drawAspectRatio( string $attr, string $fl )
@@ -501,7 +501,11 @@ global proc AEspReticleLocDrawAspectRatios( string $attr )
     int $numARs = `getAttr -s $attr`;
     for ($i = 0; $i < $numARs; $i++)
     {
-        float $aspectRatio = spSprintf("%1.2f",`getAttr ($attr+"["+$i+"].aspectRatio")`);
+        // limit label to two decimal digits
+        float $aspectRatio = getAttr($attr+"["+$i+"].aspectRatio");
+        int $ratio = $aspectRatio * 100.0 + 0.5;
+        $aspectRatio = $ratio / 100.0;
+
         string $fl = `frameLayout -label $aspectRatio ("AEspReticleLocFL"+$i)`;
         columnLayout ($fl+"CL");
         drawAspectRatio( ($attr+"["+$i+"]") , $fl);
