@@ -437,7 +437,7 @@ global proc AEspReticleLocSetProjection( string $node, string $setting )
             float $projAR[] = `floatFieldGrp -query -value ("AEspReticleLoc"+$paAttr)`;
             $projGate[0] = precision($projGate[0],3);
             $projGate[1] = precision($projGate[0]/$projAR[0],3);
-            foatFieldGrp -edit -value2 $projGate[1] ("AEspReticleLoc"+$attr);
+            floatFieldGrp -edit -value2 $projGate[1] ("AEspReticleLoc"+$attr);
             return;
     }
 
