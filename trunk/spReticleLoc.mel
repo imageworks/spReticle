@@ -33,8 +33,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 
-spInclude "<plugins/others/spReticleLoc.so>";
-
 global proc spReticleLocCreate()
 {
     string $reticleLoc[] = `ls -type spReticleLoc`;
