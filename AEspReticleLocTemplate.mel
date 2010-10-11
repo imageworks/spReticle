@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2009, Sony Pictures Imageworks Inc.
+// Copyright (c) 2009, Sony Pictures Imageworks
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -634,6 +634,7 @@ global proc AEspReticleLocTemplate( string $nodeName )
             editorTemplate -addControl "visibility";
             editorTemplate -addControl "drawingEnabled";
             editorTemplate -label "Not Selectable" -addControl "template";
+            editorTemplate -addControl "enableTextDrawing";
         editorTemplate -endNoOptimize;
 
     editorTemplate -beginLayout "Filmback Attributes" -collapse 1;
@@ -677,7 +678,7 @@ global proc AEspReticleLocTemplate( string $nodeName )
     editorTemplate -endLayout;
     editorTemplate -callCustom "AEspReticleLocDrawAspectRatios" "AEspReticleLocDrawAspectRatios" "aspectRatios";
     editorTemplate -callCustom "AEspReticleLocDrawText" "AEspReticleLocDrawText" "text";
-    editorTemplate -beginLayout "Options" -collapse 1;
+    editorTemplate -beginLayout "Options" -collapse 0;
         editorTemplate -label "Text Color" -addControl "miscTextColor";
         editorTemplate -label "Text Transp." -addControl "miscTextTrans";
         editorTemplate -addControl "lineColor";
