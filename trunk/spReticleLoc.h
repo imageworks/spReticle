@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2009, Sony Pictures Imageworks Inc.
+// Copyright (c) 2009, Sony Pictures Imageworks
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -60,6 +60,7 @@ public:
 public:
     static MTypeId id;
     static MObject DrawingEnabled;
+    static MObject EnableTextDrawing; // added by sjt@sjt.is (May 2010).
     static MObject FilmbackAperture;
     static MObject HorizontalFilmAperture;
     static MObject VerticalFilmAperture;
@@ -214,6 +215,7 @@ private:
     {
         public:
             bool   drawingEnabled;
+            bool   enableTextDrawing;
             bool   useSpRet;
             bool   displayLineH;
             bool   displayLineV;

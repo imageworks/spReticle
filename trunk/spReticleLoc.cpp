@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2009, Sony Pictures Imageworks Inc.
+// Copyright (c) 2009, Sony Pictures Imageworks
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -93,6 +93,7 @@
 
 MTypeId spReticleLoc::id( 0x00000502 );
 MObject spReticleLoc::DrawingEnabled;
+MObject spReticleLoc::EnableTextDrawing;
 MObject spReticleLoc::FilmbackAperture;
 MObject spReticleLoc::HorizontalFilmAperture;
 MObject spReticleLoc::VerticalFilmAperture;
@@ -721,10 +722,14 @@ MStatus spReticleLoc::getOptions()
 
     // Check to see if drawing is enabled
     p = MPlug ( thisNode, DrawingEnabled );
-    McheckStatus( p.getValue ( options.drawingEnabled ), "spReticleLoc::getOptions drawingEnabled" );
+    McheckStatus ( p.getValue ( options.drawingEnabled ), "spReticleLoc::getOptions drawingEnabled" );
 
     if (options.drawingEnabled)
     {
+        // Check to see if the text should be rendered;
+        p = MPlug ( thisNode, EnableTextDrawing );
+        McheckStatus ( p.getValue( options.enableTextDrawing), "spReticleLoc::getOptions enableTextDrawing" );
+
         // Check to see if locator should filter for useSpReticle attribute
         // on the camera;
         p = MPlug ( thisNode, UseSpReticle );
@@ -1194,6 +1199,7 @@ void spReticleLoc::drawText(MString text, double tx, double ty,
     MPoint textPos = getPoint((float)tx, (float)ty, view);
     glColor4f( textColor.r, textColor.g, textColor.b, 1-textColor.a );
     view.drawText(text, textPos, textAlign);
+    glFlush(); // added by sjt@sjt.is (May 2010).
 
     // Turn on z-depth test
     glDepthMask( GL_TRUE );
@@ -1593,7 +1599,7 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
         getOptions();
 
     // Drawing not enabled, return
-    if ( !options.drawingEnabled )
+    if (!options.drawingEnabled)
         return;
 
     // Get the dagPath, node and function set for the currently displaying camera
@@ -1604,7 +1610,8 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
     camera.setObject( cameraPath );
 
     // If camera is orthographic, then return
-    if ( camera.isOrtho() ) return;
+    if (camera.isOrtho()) 
+        return;
 
     // Using useSpReticle Filter, check camera for attribute
     if (options.useSpRet)
@@ -1616,13 +1623,13 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
         MPlug useReticlePlug = camera.findPlug("useSpReticle", &stat);
 
         // If the plug is valid (not null) get the current value
-        if (!useReticlePlug.isNull() )
+        if (!useReticlePlug.isNull())
         {
             McheckVoid ( useReticlePlug.getValue( useReticle ), "spReticleLoc::draw get useSpReticle plug");
         }
 
         // If camera is not set to use reticle then return
-        if ( !useReticle )
+        if (!useReticle)
             return;
     }
 
@@ -1659,14 +1666,14 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
     calcPortGeom();
 
     // Update text data
-    if ( needToUpdateTextData() || needRefresh )
+    if (needToUpdateTextData() || needRefresh)
     {
         // Get the text data
         getTextData();
     }
 
     // Update aspect ratios
-    if ( needToUpdateAspectRatios() || needRefresh )
+    if (needToUpdateAspectRatios() || needRefresh)
     {
         // Get the aspect ratio data
         getAspectRatioData();
@@ -1702,19 +1709,19 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
     calcFilmbackGeom();
 
     // Calculate the projection gate geometry
-    if ( filmback.displayProjGate )
+    if (filmback.displayProjGate)
         calcMaskGeom(filmback.projGeom,filmback.horizontalProjectionGate,filmback.verticalProjectionGate,filmback.imageGeom,filmback.horizontalImageAperture,filmback.verticalImageAperture);
 
     // Calculate the safe action geometry
-    if ( filmback.displaySafeAction )
+    if (filmback.displaySafeAction)
         calcFilmbackSafeActionGeom();
 
     // Calculate the safe title geometry
-    if ( filmback.displaySafeTitle )
+    if (filmback.displaySafeTitle)
         calcFilmbackSafeTitleGeom();
 
     // Calculate the projection gate geometry
-    if ( panScan.displayMode != 0 )
+    if (panScan.displayMode != 0)
         calcPanScanGeom( panScan );
 
     // Calculate the aspect ratio geometry
@@ -1929,7 +1936,8 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
     //drawInternalTextElements(view);
 
     // Draw custom text elements
-    drawCustomTextElements(view);
+    if ( options.enableTextDrawing)
+        drawCustomTextElements(view);
 
     // Turn off blending
     glDisable(GL_BLEND);
@@ -2024,7 +2032,11 @@ MStatus spReticleLoc::initialize()
     McheckStatus(stat,"create drawingEnabled attribute");
     nAttr.setInternal(true);
 
-    HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumericData::kFloat, 0.864, &stat );
+    EnableTextDrawing = nAttr.create( "enableTextDrawing","etd",MFnNumericData::kBoolean, 1, &stat );
+    McheckStatus(stat,"create enableTextDrawing attribute");
+    nAttr.setInternal(true);
+
+HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumericData::kFloat, 0.864, &stat );
     McheckStatus(stat,"create horizontalFilmAperture attribute");
     nAttr.setInternal(true);
 
@@ -2462,6 +2474,8 @@ MStatus spReticleLoc::initialize()
     tAttr.setConnectable(false);
     tAttr.setDefault(defaultTextAttr);
 
+    stat = addAttribute(EnableTextDrawing);
+        McheckStatus(stat,"addAttribute enableTextDrawing");
     stat = addAttribute (DrawingEnabled);
         McheckStatus(stat,"addAttribute drawingEnabled");
     stat = addAttribute (FilmbackAperture);

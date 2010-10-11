@@ -1,6 +1,9 @@
 Download Versions Information:
 ------------------------------
 
+1.2  (10/11/2010)
+     New enableTextDrawing option (added by Sveinbjörn J. Tryggvason at sjt@sjt.is).
+
 1.1  (08/06/2009) 
      Fixes in AEspReticleLocTemplate.mel:
      - removed spSprintf dependency.
