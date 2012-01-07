@@ -2032,7 +2032,7 @@ MStatus spReticleLoc::initialize()
     McheckStatus(stat,"create drawingEnabled attribute");
     nAttr.setInternal(true);
 
-    EnableTextDrawing = nAttr.create( "enableTextDrawing","etd",MFnNumericData::kBoolean, 1, &stat );
+    EnableTextDrawing = nAttr.create( "enableTextDrawing", "etd", MFnNumericData::kBoolean, 1, &stat );
     McheckStatus(stat,"create enableTextDrawing attribute");
     nAttr.setInternal(true);
 
@@ -2369,7 +2369,7 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     nAttr.setMax(1.0);
     nAttr.setInternal(true);
 
-    HideLocator = nAttr.create( "hideLocator", "hl", MFnNumericData::kBoolean, false, &stat );
+    HideLocator = nAttr.create( "hideLocator", "hlc", MFnNumericData::kBoolean, false, &stat );
     McheckStatus(stat,"create hideLocator attribute");
     nAttr.setInternal(true);
 
