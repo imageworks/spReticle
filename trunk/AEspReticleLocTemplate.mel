@@ -276,35 +276,43 @@ global proc AEspReticleLocSetFilmback( string $node, string $setting )
             break;
     }
 
-    if (($newHfa && $newVfa) && (($newHfa != $hfa) ||
-        ($newVfa != $vfa)) && (about("-batch") == 0))
+    if (`getAttr($node+"driveCameraAperture")` == 1)
     {
-        string $result = `confirmDialog -title "Update cameras?"
-                -message "Would you like me to update the cameras with the new filmback values?"
-                -button	"Yes"
-                -button "No"`;
-        if ($result == "Yes")
+        if (($newHfa && $newVfa) && (($newHfa != $hfa) ||
+            ($newVfa != $vfa)) && (about("-batch") == 0))
         {
-            string $attrs[] = {".cameraAperture",".hfa",".vfa"};
-            int $locked[];
-            string $cameras[] = ls("-ca");
-            for ($camera in $cameras)
+            string $result = `confirmDialog -title "Update cameras?"
+                    -message "Would you like me to update the cameras with the new filmback values?"
+                    -button	"Yes"
+                    -button "No"`;
+            if ($result == "Yes")
             {
-                if (!getAttr($camera+".orthographic"))
+                string $attrs[] = {".cameraAperture",".hfa",".vfa"};
+                int $locked[];
+                string $cameras[] = ls("-ca");
+                for ($camera in $cameras)
                 {
-                    for ($i = 0; $i < size($attrs); $i++)
+                    if (!getAttr($camera+".orthographic"))
                     {
-                        $locked[$i] = getAttr("-lock",$camera+$attrs[$i]);
-                        if ($locked[$i])
-                            setAttr -lock 0 ($camera+$attrs[$i]);
-                    }
-                    setAttr ($camera+".cameraAperture") $newHfa $newVfa;
-                    for ($i = 0; $i < size($attrs); $i++)
-                    {
-                        if ($locked[$i])
-                            setAttr -lock 1 ($camera+$attrs[$i]);
+                        for ($i = 0; $i < size($attrs); $i++)
+                        {
+                            $locked[$i] = getAttr("-lock",$camera+$attrs[$i]);
+                            if ($locked[$i])
+                                setAttr -lock 0 ($camera+$attrs[$i]);
+                        }
+                        setAttr ($camera+".cameraAperture") $newHfa $newVfa;
+                        for ($i = 0; $i < size($attrs); $i++)
+                        {
+                            if ($locked[$i])
+                                setAttr -lock 1 ($camera+$attrs[$i]);
+                        }
                     }
                 }
+            }
+            else
+            {
+                print("Not updating camera ...\n");
+                setAttr($node+"driveCameraAperture") 0;
             }
         }
     }
