@@ -32,6 +32,14 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
+#include "defines.h"
+#include "util.h"
+#include "OpenGLRenderer.h"
+
+#if(MAYA_API_VERSION>=201400 && USE_MUIDRAWMANAGER)
+#include "V2Renderer.h"
+#endif
+
 class spReticleLoc : public MPxLocatorNode
 {
 public:
@@ -54,11 +62,18 @@ public:
 
     virtual bool            isTransparent() const {return true;}
     virtual bool            drawLast() const      {return true;}
-    virtual bool            isBounded() const     {return true;}
-    virtual MBoundingBox    boundingBox() const;
+    virtual bool            isBounded() const     {return false;}
+
+    // Get node ready for drawing
+    bool                    prepForDraw(const MObject & thisNode, const MDagPath & path, const MDagPath & cameraPath);
+    
+    // Base draw method
+    void                    drawBase(int width, int height, GPURenderer* renderer);
 
 public:
     static MTypeId id;
+    static MString drawDbClassification;
+    static MString drawRegistrantId;
     static MObject DrawingEnabled;
     static MObject EnableTextDrawing; // added by sjt@sjt.is (May 2010).
     static MObject FilmbackAperture;
@@ -78,6 +93,7 @@ public:
     static MObject HorizontalSafeTitle;
     static MObject VerticalSafeTitle;
     static MObject DisplaySafeTitle;
+    static MObject RelativeFilmback;
     static MObject AspectRatios;
     static MObject AspectRatio;
     static MObject DisplayMode;
@@ -98,17 +114,23 @@ public:
     static MObject PanScanMaskTrans;
     static MObject PanScanLineColor;
     static MObject PanScanLineTrans;
-    static MObject FilmGateColor;
-    static MObject FilmGateTrans;
-    static MObject ProjGateColor;
-    static MObject ProjGateTrans;
+    static MObject FilmGateMaskColor;
+    static MObject FilmGateMaskTrans;
+    static MObject FilmGateLineColor;
+    static MObject FilmGateLineTrans;
+    static MObject ProjGateMaskColor;
+    static MObject ProjGateMaskTrans;
+    static MObject ProjGateLineColor;
+    static MObject ProjGateLineTrans;
     static MObject HideLocator;
-    static MObject UseSpReticle;
+    static MObject CameraFilterMode;
+    static MObject Cameras;
     static MObject DisplayLineH;
     static MObject DisplayLineV;
     static MObject DisplayThirdsH;
     static MObject DisplayThirdsV;
     static MObject DisplayCrosshair;
+    static MObject DisplayFieldGuide;
     static MObject MiscTextColor;
     static MObject MiscTextTrans;
     static MObject LineColor;
@@ -131,6 +153,7 @@ public:
     static MObject TextType;
     static MObject TextStr;
     static MObject TextAlign;
+    static MObject TextVAlign;
     static MObject TextPos;
     static MObject TextPosX;
     static MObject TextPosY;
@@ -139,110 +162,13 @@ public:
     static MObject TextARLevel;
     static MObject TextColor;
     static MObject TextTrans;
+    static MObject TextEnabled;
+    static MObject TextBold;
+    static MObject TextSize;
+    static MObject TextScale;
     static MObject Tag;
 
 private:
-    class Geom
-    {
-        public:
-            double  x1, x2;
-            double  y1, y2;
-            double  x, y;
-            MColor  lineColor;
-            MColor  maskColor;
-            bool    isValid;
-    };
-
-    class Aspect_Ratio
-    {
-        public:
-            double aspectRatio;
-            int    displayMode;
-            bool   displaySafeAction;
-            bool   displaySafeTitle;
-
-            Geom   aspectGeom;
-            Geom   safeActionGeom;
-            Geom   safeTitleGeom;
-    };
-
-    class PanScan : public Aspect_Ratio
-    {
-        public:
-            double panScanRatio;
-            double panScanOffset;
-    };
-
-    class Filmback
-    {
-        public:
-            double horizontalFilmAperture;
-            double verticalFilmAperture;
-            double soundTrackWidth;
-            double horizontalImageAperture;
-            double verticalImageAperture;
-            double displayFilmGate;
-            double horizontalProjectionGate;
-            double verticalProjectionGate;
-            double horizontalSafeAction;
-            double verticalSafeAction;
-            double horizontalSafeTitle;
-            double verticalSafeTitle;
-            double displayProjGate;
-            bool   displaySafeAction;
-            bool   displaySafeTitle;
-
-            Geom   filmbackGeom;
-            Geom   imageGeom;
-            Geom   projGeom;
-            Geom   safeActionGeom;
-            Geom   safeTitleGeom;
-    };
-
-    class PadOptions
-    {
-        public:
-            bool   usePad;
-            bool   isPadded;
-            double padAmountX;
-            double padAmountY;
-            int    displayMode;
-
-            Geom   padGeom;
-    };
-
-    class Options
-    {
-        public:
-            bool   drawingEnabled;
-            bool   enableTextDrawing;
-            bool   useSpRet;
-            bool   displayLineH;
-            bool   displayLineV;
-            bool   displayThirdsH;
-            bool   displayThirdsV;
-            bool   displayCrosshair;
-            bool   driveCameraAperture;
-            bool   useOverscan;
-            double maximumDistance;
-            MColor textColor;
-            MColor lineColor;
-    };
-
-    class TextData
-    {
-        public:
-            int     textType;
-            MString textStr;
-            int     textAlign;
-            double textPosX;
-            double textPosY;
-            int    textPosRel;
-            int    textLevel;
-            int    textARLevel;
-            MColor textColor;
-    };
-
     MStatus getPadData();
     MStatus getFilmbackData();
     MStatus getProjectionData();
@@ -254,11 +180,10 @@ private:
     bool needToUpdateAspectRatios();
     MStatus getPanScanData ( PanScan & ps );
     MStatus getTextChildren ( MPlug tPlug, TextData & td );
+    MStatus generateTextBuffer(TextData &td);
     MStatus getTextData();
-    bool needToUpdateTextData();
     MStatus getOptions();
 
-    MPoint getPoint (float x, float y, M3dView & view);
     MStatus getColor ( MObject colorObj, MObject transObj, MColor & color );
     MMatrix getMatrix( MString matrixStr );
     void printAspectRatio ( Aspect_Ratio & ar );
@@ -275,15 +200,11 @@ private:
     void calcSafeTitleGeom( Aspect_Ratio & ar );
     void calcAspectGeom( Aspect_Ratio & ar);
     void calcPanScanGeom( PanScan & ps );
-    void drawMask3D( Geom g1, Geom g2, double z, MColor color, bool sides );
-    void drawLine3D( double x1, double x2, double y1, double y2, double z, MColor color, bool stipple );
-    void drawLines3D( Geom g, double z, MColor color, bool sides, bool stipple );
-    void drawMask( Geom g1, Geom g2, MColor color, bool sides );
-    void drawLine( double x1, double x2, double y1, double y2, MColor color, bool stipple );
-    void drawLines( Geom g, MColor color, bool sides, bool stipple );
-    void drawText( MString text, double tx, double ty, MColor color, M3dView::TextPosition, M3dView & view );
-    void drawInternalTextElements(M3dView & view);
-    void drawCustomTextElements(M3dView & view);
+    bool calcDynamicText(TextData *td, const int i);
+    bool getTextLevelGeometry(TextData *td, Geom &g, const int i);
+    bool calcTextPosition(TextData *td, const Geom &g, double &x, double &y, const int i);
+
+    void drawCustomTextElements(GPURenderer* renderer);
 
     Filmback   oFilmback,filmback;
     PadOptions pad;
@@ -293,6 +214,7 @@ private:
 
     double    portWidth;
     double    portHeight;
+    double    scaleFactor;
     double    overscan;
     double    ncp;
     MMatrix   wim;
@@ -300,11 +222,88 @@ private:
     MObject   thisNode;
 
     int    numAspectRatios;
-    double loadDefault;
+    bool   loadDefault;
     double maximumDist;
     bool   needRefresh;
 
     std::vector<Aspect_Ratio> ars;
     std::vector<TextData>     text;
+
+    OpenGLRenderer oglRenderer;
 };
 
+//---------------------------------------------------------------------------
+// Viewport 2.0 override implementation
+//---------------------------------------------------------------------------
+#if (MAYA_API_VERSION>=201200)
+
+class spReticleLocData : public MUserData
+{
+public:
+    spReticleLocData() : MUserData(false) {} // don't delete after draw
+    virtual ~spReticleLocData() {}
+
+    spReticleLoc* reticle;
+    GPURenderer* renderer;
+    bool draw;
+};
+
+class spReticleLocDrawOverride : public MHWRender::MPxDrawOverride
+{
+public:
+    static MHWRender::MPxDrawOverride* Creator(const MObject& obj)
+    {
+            return new spReticleLocDrawOverride(obj);
+    }
+
+    virtual ~spReticleLocDrawOverride();
+
+#if (MAYA_API_VERSION>=201300)
+    virtual MHWRender::DrawAPI supportedDrawAPIs() const;
+    
+    virtual bool isBounded(
+                           const MDagPath& objPath,
+                           const MDagPath& cameraPath) const;
+    
+    virtual bool disableInternalBoundingBoxDraw() const;
+#endif
+
+    virtual MBoundingBox boundingBox(
+                                     const MDagPath& objPath,
+                                     const MDagPath& cameraPath) const;    
+
+#if (MAYA_API_VERSION<201400)
+    virtual MUserData* prepareForDraw(
+                                      const MDagPath& objPath,
+                                      const MDagPath& cameraPath,
+                                      MUserData* oldData);
+#else
+    virtual MUserData* prepareForDraw(
+                                      const MDagPath& objPath,
+                                      const MDagPath& cameraPath,
+                                      const MHWRender::MFrameContext& frameContext,
+                                      MUserData* oldData);
+
+    virtual bool hasUIDrawables() const;
+
+    virtual void addUIDrawables(
+                                const MDagPath& objPath,
+                                MHWRender::MUIDrawManager& drawManager,
+                                const MHWRender::MFrameContext& frameContext,
+                                const MUserData* data);
+#endif
+
+    static void draw(const MHWRender::MDrawContext& context, const MUserData* data);
+
+private:
+    spReticleLocDrawOverride(const MObject& obj);
+    spReticleLocData* data;
+
+#if (MAYA_API_VERSION>=201400 && USE_MUIDRAWMANAGER)
+    V2Renderer renderer;
+#else
+    OpenGLRenderer renderer;
+#endif
+};
+
+#endif
