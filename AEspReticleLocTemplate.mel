@@ -247,10 +247,9 @@ global proc AEspReticleLocSetFilmback( string $node, string $setting )
             int $pad = 0;
             if (catchQuiet($pad = float($spShowCameraFilmAperaturePad) != 0) || $pad == 0) {
                 setAttr ($node+$pAttr) 0;
-                setAttr ($node+$paAttr) 0.0 0.0;
+                setAttr ($node+$pAttr) 0.0 0.0;
             }
-            else 
-            {
+            else {
                 setAttr ($node+$pAttr) 1;
                 setAttr ($node+$paAttr) $spShowCameraFilmAperaturePad $spShowCameraFilmAperaturePad;
             }
