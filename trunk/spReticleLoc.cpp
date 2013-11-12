@@ -42,8 +42,10 @@
  * masks, lines and text.There is also an option to specify whether the
  * reticle should respect the show/hide locator display options. Finally,
  * the reticle can be filtered to only display on cameras which contain
- * the attribute useSpReticle, set to true.
+ * an attribute (see defines.h) set to true or are connected to the reticle.
  */
+
+#include "defines.h"
 
 #include <iostream>
 #include <vector>
@@ -76,6 +78,17 @@
 #include <maya/MGlobal.h>
 #include <maya/MFileIO.h>
 #include <maya/MFileObject.h>
+#include <maya/MFnMessageAttribute.h>
+
+#if (MAYA_API_VERSION>=201200)
+// Viewport 2.0 includes
+#include <maya/MDrawRegistry.h>
+#include <maya/MPxDrawOverride.h>
+#include <maya/MUserData.h>
+#include <maya/MDrawContext.h>
+#include <maya/MGlobal.h>
+#include <maya/MSelectionList.h>
+#endif
 
 #include "spReticleLoc.h"
 
@@ -92,11 +105,18 @@
     }
 
 MTypeId spReticleLoc::id( 0x00000502 );
+
+#if (MAYA_API_VERSION>=201200)
+	MString	spReticleLoc::drawDbClassification("drawdb/geometry/spReticleLoc");
+	MString	spReticleLoc::drawRegistrantId("spReticleLoc");
+#endif
+
 MObject spReticleLoc::DrawingEnabled;
 MObject spReticleLoc::EnableTextDrawing;
 MObject spReticleLoc::FilmbackAperture;
 MObject spReticleLoc::HorizontalFilmAperture;
 MObject spReticleLoc::VerticalFilmAperture;
+MObject spReticleLoc::RelativeFilmback;
 MObject spReticleLoc::SoundTrackWidth;
 MObject spReticleLoc::DisplayFilmGate;
 MObject spReticleLoc::ProjectionGate;
@@ -131,17 +151,27 @@ MObject spReticleLoc::PanScanMaskColor;
 MObject spReticleLoc::PanScanMaskTrans;
 MObject spReticleLoc::PanScanLineColor;
 MObject spReticleLoc::PanScanLineTrans;
-MObject spReticleLoc::FilmGateColor;
-MObject spReticleLoc::FilmGateTrans;
-MObject spReticleLoc::ProjGateColor;
-MObject spReticleLoc::ProjGateTrans;
+MObject spReticleLoc::FilmGateMaskColor;
+MObject spReticleLoc::FilmGateMaskTrans;
+MObject spReticleLoc::FilmGateLineColor;
+MObject spReticleLoc::FilmGateLineTrans;
+MObject spReticleLoc::ProjGateMaskColor;
+MObject spReticleLoc::ProjGateMaskTrans;
+MObject spReticleLoc::ProjGateLineColor;
+MObject spReticleLoc::ProjGateLineTrans;
 MObject spReticleLoc::HideLocator;
-MObject spReticleLoc::UseSpReticle;
+
+// Deprecating this attribute in favor of CameraFilterMode, using an alias temporarily
+//MObject spReticleLoc::UseSpReticle;
+MObject spReticleLoc::CameraFilterMode;
+MObject spReticleLoc::Cameras;
+
 MObject spReticleLoc::DisplayLineH;
 MObject spReticleLoc::DisplayLineV;
 MObject spReticleLoc::DisplayThirdsH;
 MObject spReticleLoc::DisplayThirdsV;
 MObject spReticleLoc::DisplayCrosshair;
+MObject spReticleLoc::DisplayFieldGuide;
 MObject spReticleLoc::MiscTextColor;
 MObject spReticleLoc::MiscTextTrans;
 MObject spReticleLoc::LineColor;
@@ -164,6 +194,7 @@ MObject spReticleLoc::Text;
 MObject spReticleLoc::TextType;
 MObject spReticleLoc::TextStr;
 MObject spReticleLoc::TextAlign;
+MObject spReticleLoc::TextVAlign;
 MObject spReticleLoc::TextPos;
 MObject spReticleLoc::TextPosX;
 MObject spReticleLoc::TextPosY;
@@ -172,25 +203,14 @@ MObject spReticleLoc::TextLevel;
 MObject spReticleLoc::TextARLevel;
 MObject spReticleLoc::TextColor;
 MObject spReticleLoc::TextTrans;
+MObject spReticleLoc::TextEnabled;
+MObject spReticleLoc::TextBold;
+MObject spReticleLoc::TextSize;
+MObject spReticleLoc::TextScale;
 MObject spReticleLoc::Tag;
 
 spReticleLoc::spReticleLoc() {}
 spReticleLoc::~spReticleLoc() {}
-
-// This function takes in a screen x and y value and converts it to values
-// on the near and far clipping planes.
-//
-MPoint spReticleLoc::getPoint(float x, float y, M3dView & view)
-{
-    MPoint p, ncp, fcp;
-
-    view.viewToWorld(int(x), int(y), ncp, fcp);
-    MVector v = fcp - ncp;
-    v.normalize();
-    p = (ncp + v) * wim;
-
-    return p;
-}
 
 // This method will retrieve the individual r,g,b and alpha values from
 // various plugs and store them in an MColor object.
@@ -342,12 +362,13 @@ void spReticleLoc::printGeom(Geom & g)
 void spReticleLoc::printOptions()
 {
     cerr << "-------------------------------------------------" << endl;
-    cerr << "useSpRet            : " << options.useSpRet << endl;
+    cerr << "cameraFilterMode   : " << options.cameraFilterMode << endl;
     cerr << "displayLineH        : " << options.displayLineH << endl;
     cerr << "displayLineV        : " << options.displayLineV << endl;
     cerr << "displayThirdsH      : " << options.displayThirdsH << endl;
     cerr << "displayThirdsV      : " << options.displayThirdsV << endl;
     cerr << "displayCrosshair    : " << options.displayCrosshair << endl;
+    cerr << "displayFieldGuide   : " << options.displayFieldGuide << endl;
     cerr << "driveCameraAperture : " << options.driveCameraAperture << endl;
     cerr << "maximumDistance     : " << options.maximumDistance << endl;
     cerr << "useOverscan         : " << options.useOverscan << endl;
@@ -373,7 +394,7 @@ MStatus spReticleLoc::getPadData()
     McheckStatus ( p.getValue ( pad.padAmountY  ), "spReticleLoc::getPadData padAmountX");
 
     // Set whether the filmback is padded
-    pad.isPadded = (pad.padAmountX != 0 && pad.padAmountY != 0);
+    pad.isPadded = (pad.padAmountX > EPSILON || pad.padAmountY > EPSILON );
 
     if (pad.usePad && pad.isPadded)
     {
@@ -388,6 +409,11 @@ MStatus spReticleLoc::getPadData()
         // Get the pad line color
         stat = getColor( PadLineColor, PadLineTrans, pad.padGeom.lineColor );
         McheckStatus ( stat, "spReticleLoc::getPadData get padLineColor");
+    }
+    else
+    {
+        pad.padAmountX = 0;
+        pad.padAmountY = 0;
     }
 
     return MS::kSuccess;
@@ -409,17 +435,25 @@ MStatus spReticleLoc::getFilmbackData()
     p = MPlug( thisNode, VerticalFilmAperture );
     McheckStatus ( p.getValue ( filmback.verticalFilmAperture  ), "spReticleLoc::getFilmbackData get verticalFilmAperture");
 
-    //Get vertical film aperture
+    //Get whether the film aperture is relative or absolute
+    p = MPlug( thisNode, RelativeFilmback );
+    McheckStatus ( p.getValue ( filmback.relativeFilmback  ), "spReticleLoc::getFilmbackData get relativeFilmback");
+
+    //Get sound track width
     p = MPlug( thisNode, SoundTrackWidth );
     McheckStatus ( p.getValue ( filmback.soundTrackWidth  ), "spReticleLoc::getFilmbackData get soundTrackWidth");
 
     //Get whether to display the film gate
     p = MPlug( thisNode, DisplayFilmGate );
     McheckStatus ( p.getValue ( filmback.displayFilmGate  ), "spReticleLoc::getFilmbackData get displayFilmGate");
-
+    
+    //Get the filmback mask color
+    stat = getColor( FilmGateMaskColor, FilmGateMaskTrans, filmback.filmbackGeom.maskColor );
+    McheckStatus ( stat, "spReticleLoc::getFilmbackData get filmGateMaskColor");
+    
     //Get the filmback line color
-    stat = getColor( FilmGateColor, FilmGateTrans, filmback.filmbackGeom.lineColor );
-    McheckStatus ( stat, "spReticleLoc::getFilmbackData get filmGateColor");
+    stat = getColor( FilmGateLineColor, FilmGateLineTrans, filmback.filmbackGeom.lineColor );
+    McheckStatus ( stat, "spReticleLoc::getFilmbackData get filmGateLineColor");
 
     return MS::kSuccess;
 }
@@ -447,9 +481,13 @@ MStatus spReticleLoc::getProjectionData()
         p = MPlug( thisNode, VerticalProjectionGate );
         McheckStatus ( p.getValue ( filmback.verticalProjectionGate  ), "spReticleLoc::getProjectionData get verticalProjectionGate");
 
+        //Get the projection gate mask color
+        stat = getColor( ProjGateMaskColor, ProjGateMaskTrans, filmback.projGeom.maskColor );
+        McheckStatus ( stat, "spReticleLoc::getProjectionData get projGateMaskColor");
+
         //Get the projection gate line color
-        stat = getColor( ProjGateColor, ProjGateTrans, filmback.projGeom.lineColor );
-        McheckStatus ( stat, "spReticleLoc::getProjectionData get projGateColor");
+        stat = getColor( ProjGateLineColor, ProjGateLineTrans, filmback.projGeom.lineColor );
+        McheckStatus ( stat, "spReticleLoc::getProjectionData get projGateLineColor");
     }
 
     return MS::kSuccess;
@@ -675,6 +713,21 @@ MStatus spReticleLoc::getTextChildren(MPlug tPlug, TextData & td)
     p = tPlug.child( 8 , &stat );
     McheckStatus( p.getValue( td.textColor.a ), "spReticleLoc::getTextChildren - textTrans" );
 
+    p = tPlug.child( 9, &stat );
+    McheckStatus( p.getValue( td.textEnabled ), "spReticleLoc::getTextChildren - textEnabled" );
+
+    p = tPlug.child( 10 , &stat );
+    McheckStatus( p.getValue( td.textBold ), "spReticleLoc::getTextChildren - textBold" );
+        
+    p = tPlug.child( 11 , &stat );
+    McheckStatus( p.getValue( td.textSize ), "spReticleLoc::getTextChildren - textSize" );
+        
+    p = tPlug.child( 12 , &stat );
+    McheckStatus( p.getValue( td.textScale ), "spReticleLoc::getTextChildren - textScale" );
+        
+    p = tPlug.child( 13 , &stat );
+    McheckStatus( p.getValue( td.textVAlign ), "spReticleLoc::getTextChildren - textVAlign" );
+
     return MS::kSuccess;
 }
 
@@ -707,12 +760,6 @@ MStatus spReticleLoc::getTextData()
     return MS::kSuccess;
 }
 
-bool spReticleLoc::needToUpdateTextData()
-{
-    MPlug p = MPlug( thisNode, Text );
-    return ( text.size() != p.numElements() );
-}
-
 // This method retrieves all of the options settings.
 //
 MStatus spReticleLoc::getOptions()
@@ -730,10 +777,9 @@ MStatus spReticleLoc::getOptions()
         p = MPlug ( thisNode, EnableTextDrawing );
         McheckStatus ( p.getValue( options.enableTextDrawing), "spReticleLoc::getOptions enableTextDrawing" );
 
-        // Check to see if locator should filter for useSpReticle attribute
-        // on the camera;
-        p = MPlug ( thisNode, UseSpReticle );
-        McheckStatus ( p.getValue ( options.useSpRet  ), "spReticleLoc::getOptions useSpReticle");
+        // Get the camera filter mode
+        p = MPlug ( thisNode, CameraFilterMode );
+        McheckStatus ( p.getValue ( options.cameraFilterMode  ), "spReticleLoc::getOptions cameraFilterMode");
 
         // Display horizontal line option;
         p = MPlug ( thisNode, DisplayLineH );
@@ -754,7 +800,11 @@ MStatus spReticleLoc::getOptions()
         // Display crosshair option;
         p = MPlug ( thisNode, DisplayCrosshair );
         McheckStatus ( p.getValue ( options.displayCrosshair  ), "spReticleLoc::getOptions displayCrosshair");
-
+        
+        // Display crosshair option;
+        p = MPlug ( thisNode, DisplayFieldGuide );
+        McheckStatus ( p.getValue ( options.displayFieldGuide  ), "spReticleLoc::getOptions displayFieldGuide");
+        
         // Text Color;
         stat = getColor (MiscTextColor, MiscTextTrans, options.textColor );
         McheckStatus ( stat, "spReticleLoc::getOptions textColor");
@@ -807,7 +857,7 @@ void spReticleLoc::calcFilmbackGeom()
     filmback = oFilmback;
 
     // See if we are using the camera's filmback data
-    bool useCameraFilmback = filmback.horizontalFilmAperture == -1;
+    bool useCameraFilmback = filmback.horizontalFilmAperture < 0;
 
     // If the horizontalFilmAperture equals -1, then use the cameras settings
     if (useCameraFilmback)
@@ -815,38 +865,21 @@ void spReticleLoc::calcFilmbackGeom()
         filmback.horizontalFilmAperture = camera.horizontalFilmAperture();
         filmback.verticalFilmAperture = camera.verticalFilmAperture();
     }
-
-    double hfa = filmback.horizontalFilmAperture;
-    double vfa = filmback.verticalFilmAperture;
-
-    double aspectRatio = hfa/vfa;
-    double nonPaddedAspectRatio = aspectRatio;
-
-    // Remove pad from filmback and aspect ratio
-    if (pad.usePad && pad.isPadded)
-    {
-        filmback.horizontalFilmAperture -= pad.padAmountX;
-        filmback.verticalFilmAperture -= pad.padAmountY;
-        nonPaddedAspectRatio = filmback.horizontalFilmAperture / filmback.verticalFilmAperture;
-        if (! pad.usePad)
-        {
-            hfa = filmback.horizontalFilmAperture;
-            vfa = filmback.verticalFilmAperture;
-            aspectRatio = nonPaddedAspectRatio;
-        }
-    }
-
     // If drive camera aperture is on, then set camera values
-    if (!useCameraFilmback && options.driveCameraAperture)
+    else if (options.driveCameraAperture)
     {
-        if (camera.horizontalFilmAperture() != hfa)
-            McheckVoid( camera.setHorizontalFilmAperture(hfa), "spReticleLoc::calcFilmbackGeom - setting "+camera.name()+".horizontalFilmAperture");
-        if (camera.verticalFilmAperture() != vfa)
-            McheckVoid( camera.setVerticalFilmAperture(vfa), "spReticleLoc::calcFilmbackGeom - setting "+camera.name()+".verticalFilmAperture");
+        if (fabs(camera.horizontalFilmAperture() - filmback.horizontalFilmAperture) > EPSILON)
+            McheckVoid( camera.setHorizontalFilmAperture(filmback.horizontalFilmAperture), "spReticleLoc::calcFilmbackGeom - setting "+camera.name()+".horizontalFilmAperture");
+        if (fabs(camera.verticalFilmAperture() - filmback.verticalFilmAperture) > EPSILON)
+            McheckVoid( camera.setVerticalFilmAperture(filmback.verticalFilmAperture), "spReticleLoc::calcFilmbackGeom - setting "+camera.name()+".verticalFilmAperture");
     }
 
-    double portAspectRatio = double(portWidth)/double(portHeight);
-    bool portHoriz = portAspectRatio > aspectRatio;
+    // Calculate the aspect ratio of the cameras filmback
+    double cameraAspectRatio = camera.horizontalFilmAperture() / camera.verticalFilmAperture();
+
+    // Calculate the aspect ratio of the viewport and determine if it has a horizontal or vertical orientation
+    double portAspectRatio = portWidth/portHeight;
+    bool portHoriz = portAspectRatio > cameraAspectRatio;
 
     MFnCamera::FilmFit filmFit = camera.filmFit();
     if (filmFit == MFnCamera::kFillFilmFit)
@@ -856,7 +889,7 @@ void spReticleLoc::calcFilmbackGeom()
         else
             filmFit = MFnCamera::kVerticalFilmFit;
     }
-    if (filmFit == MFnCamera::kOverscanFilmFit)
+    else if (filmFit == MFnCamera::kOverscanFilmFit)
     {
         if (portHoriz)
             filmFit = MFnCamera::kVerticalFilmFit;
@@ -864,75 +897,113 @@ void spReticleLoc::calcFilmbackGeom()
             filmFit = MFnCamera::kHorizontalFilmFit;
     }
 
+    double panX = 0.0;
+    double panY = 0.0;
+    double zoom = 1.0;
+
+#if MAYA_API_VERSION >= 201100
+    if (camera.panZoomEnabled() && !camera.renderPanZoom())
+    {
+        zoom = camera.zoom();
+        panX = camera.horizontalPan();
+        panY = camera.verticalPan();
+    }
+#endif
+
+    double pixelScale = 1.0;
+
+    // Calculate the pixel scale value to use when drawing the filmback
     switch ( filmFit )
     {
         case MFnCamera::kInvalid :
         case MFnCamera::kHorizontalFilmFit :
-            filmback.filmbackGeom.x = (portWidth / overscan);
-            if (pad.usePad && pad.isPadded)
-            {
-                pad.padGeom.x = filmback.filmbackGeom.x;
-                pad.padGeom.y = pad.padGeom.x / aspectRatio;
-                filmback.filmbackGeom.x /= hfa / filmback.horizontalFilmAperture;
-            }
-
-            filmback.filmbackGeom.y = filmback.filmbackGeom.x / nonPaddedAspectRatio;
+        {
+            pixelScale = portWidth / overscan / camera.horizontalFilmAperture() / zoom;
+            portGeom.x -= (panX * pixelScale);
+            portGeom.y -= (panY * pixelScale);
             break;
+        }
         case MFnCamera::kVerticalFilmFit :
-            filmback.filmbackGeom.y = (portHeight / overscan);
-            if (pad.usePad && pad.isPadded)
-            {
-                pad.padGeom.y = filmback.filmbackGeom.y;
-                pad.padGeom.x = pad.padGeom.y * aspectRatio;
-
-                filmback.filmbackGeom.y /= vfa / filmback.verticalFilmAperture;
-            }
-
-            filmback.filmbackGeom.x = filmback.filmbackGeom.y * nonPaddedAspectRatio;
+        {
+            pixelScale = portHeight / overscan / camera.verticalFilmAperture() / zoom;
+            portGeom.x -= (panX * pixelScale);
+            portGeom.y -= (panY * pixelScale);
             break;
+        }
         default:
+        {
             MGlobal::displayError( name() + " invalid camera film fit (" + filmFit + ")");
             break;
+        }
     }
 
-    // Account for lens squeeze
-    filmback.filmbackGeom.x *= camera.lensSqueezeRatio();
-    pad.padGeom.x *= camera.lensSqueezeRatio();
+    // If the reticle is in relativeFilmback mode, then scale the reticle filmback to fit the camera filmback
+    if (filmback.relativeFilmback)
+    {
+        double aspectRatio = filmback.horizontalFilmAperture / filmback.verticalFilmAperture;
+        if (aspectRatio > cameraAspectRatio)
+            pixelScale *= camera.horizontalFilmAperture() / filmback.horizontalFilmAperture;
+        else
+            pixelScale *= camera.verticalFilmAperture() / filmback.verticalFilmAperture;
+    }
 
+    // Account for lens squeeze for the filmback
+    double pixelScaleX = pixelScale * camera.lensSqueezeRatio();
+
+    // Calculate the filmback width and height
+    filmback.filmbackGeom.x = filmback.horizontalFilmAperture * pixelScaleX;
+    filmback.filmbackGeom.y = filmback.verticalFilmAperture * pixelScale;
+    
+    // Calculate the actual filmback geometry corner values    
     filmback.filmbackGeom.x1 = portGeom.x - (filmback.filmbackGeom.x / 2);
     filmback.filmbackGeom.x2 = portGeom.x + (filmback.filmbackGeom.x / 2);
     filmback.filmbackGeom.y1 = portGeom.y - (filmback.filmbackGeom.y / 2);
     filmback.filmbackGeom.y2 = portGeom.y + (filmback.filmbackGeom.y / 2);
     filmback.filmbackGeom.isValid = true;
 
-    // Calculate the image area
+    // Set the image area to match the filmback    
+    filmback.imageGeom = filmback.filmbackGeom;
     filmback.horizontalImageAperture	= filmback.horizontalFilmAperture;
     filmback.verticalImageAperture		= filmback.verticalFilmAperture;
-    filmback.imageGeom = filmback.filmbackGeom;
 
-    // Adjust for sound track if necessary
-    if (filmback.soundTrackWidth != 0)
-    {
-        filmback.horizontalImageAperture -= filmback.soundTrackWidth;
-        filmback.imageGeom.x = filmback.filmbackGeom.x * (filmback.horizontalImageAperture/filmback.horizontalFilmAperture);
-        filmback.imageGeom.x1 = filmback.filmbackGeom.x1+(filmback.filmbackGeom.x-filmback.imageGeom.x);
-    }
-
-    // Calculate rest of the pad area
+    // Calculate the pad area width and height
     if (pad.usePad && pad.isPadded)
     {
+        pad.padGeom.x = (filmback.horizontalFilmAperture - pad.padAmountX) * pixelScaleX;
+        pad.padGeom.y = (filmback.verticalFilmAperture - pad.padAmountY) * pixelScale;
+
+        // Calculate rest of the pad area
         pad.padGeom.x1 = portGeom.x - (pad.padGeom.x / 2);
         pad.padGeom.x2 = portGeom.x + (pad.padGeom.x / 2);
         pad.padGeom.y1 = portGeom.y - (pad.padGeom.y / 2);
         pad.padGeom.y2 = portGeom.y + (pad.padGeom.y / 2);
         pad.padGeom.isValid = true;
-    }
-    else
-    {
-        pad.padGeom = filmback.filmbackGeom;
-        pad.padGeom.isValid = false;
+
+        //Update the image area
+        filmback.horizontalImageAperture -= pad.padAmountX;
+        filmback.verticalImageAperture -= pad.padAmountY;
     }
 
+    // Adjust for sound track if necessary
+    double imageOffsetX = 0;
+    if (filmback.soundTrackWidth > EPSILON)
+    {
+        filmback.horizontalImageAperture -= filmback.soundTrackWidth;
+        imageOffsetX = (filmback.soundTrackWidth * pixelScaleX) / 2.0;
+    }
+
+    // Calculate the image area width & height
+    filmback.imageGeom.x = filmback.horizontalImageAperture * pixelScaleX;
+    filmback.imageGeom.y = filmback.verticalImageAperture * pixelScale;
+    
+    // Calculate the actual filmback geometry corner values    
+    filmback.imageGeom.x1 = (portGeom.x + imageOffsetX) - (filmback.imageGeom.x / 2.0f);
+    filmback.imageGeom.x2 = (portGeom.x + imageOffsetX) + (filmback.imageGeom.x / 2.0f);
+    filmback.imageGeom.y1 = portGeom.y - (filmback.imageGeom.y / 2.0f);
+    filmback.imageGeom.y2 = portGeom.y + (filmback.imageGeom.y / 2.0f);
+    filmback.imageGeom.isValid = true;
+
+    // reset safe action/title    
     filmback.safeActionGeom.isValid = false;
     filmback.safeTitleGeom.isValid = false;
 }
@@ -958,10 +1029,10 @@ void spReticleLoc::calcFilmbackSafeTitleGeom(){
 void spReticleLoc::calcMaskGeom(Geom & g, double w, double h, Geom & gSrc,
                                  double wSrc, double hSrc)
 {
-    double pw = (w != -1)?((wSrc-w)/2)/wSrc:(1-wSrc)/2;
-    double ph = (h != -1)?((hSrc-h)/2)/hSrc:(1-hSrc)/2;
+    double pw = (w >= 0)?((wSrc-w)/2.0)/wSrc:(1.0-wSrc)/2.0;
+    double ph = (h >= 0)?((hSrc-h)/2.0)/hSrc:(1.0-hSrc)/2.0;
 
-    g.x = gSrc.x*pw;
+    g.x = gSrc.x*pw*camera.lensSqueezeRatio();
     g.y = gSrc.y*ph;
 
     g.x1 = gSrc.x1+g.x;
@@ -1007,7 +1078,7 @@ void spReticleLoc::calcSafeTitleGeom( Aspect_Ratio & ar )
 //
 void spReticleLoc::calcAspectGeom( Aspect_Ratio & ar )
 {
-    ar.aspectGeom.x = filmback.imageGeom.x;
+    ar.aspectGeom.x = filmback.imageGeom.x / camera.lensSqueezeRatio();
     ar.aspectGeom.y = ar.aspectGeom.x / ar.aspectRatio;
 
     ar.aspectGeom.x1 = filmback.imageGeom.x1;
@@ -1030,16 +1101,37 @@ void spReticleLoc::calcAspectGeom( Aspect_Ratio & ar )
 //
 void spReticleLoc::calcPanScanGeom( PanScan & ps )
 {
-    if (ps.aspectRatio == -1)
-        ps.aspectRatio = filmback.horizontalFilmAperture / filmback.verticalFilmAperture;
+    //Calculate the aspect ratio of the filmback to later determine the fit of the pan/scan area    
+    float aspectRatio = filmback.horizontalImageAperture / filmback.verticalImageAperture;
+    
+    //If the aspect ratio of the pan/scan area is not set, use the filmback's aspect ratio    
+    if (ps.aspectRatio < 0)
+        ps.aspectRatio = aspectRatio;
 
-    ps.aspectGeom.y = filmback.imageGeom.x / ps.aspectRatio;
-    ps.aspectGeom.x = ps.aspectGeom.y * ps.panScanRatio;
+    //Determine the fit of the pan/scan & pan/scan area against the filmback    
+    if (ps.aspectRatio > aspectRatio && ps.panScanRatio < ps.aspectRatio)
+    {
+        ps.aspectGeom.y = (filmback.imageGeom.x / camera.lensSqueezeRatio()) / ps.aspectRatio;
+        ps.aspectGeom.x = ps.aspectGeom.y * ps.panScanRatio;
+    }
+    else if (ps.panScanRatio > aspectRatio)
+    {
+        ps.aspectGeom.x = filmback.imageGeom.x / camera.lensSqueezeRatio();
+        ps.aspectGeom.y = ps.aspectGeom.x / ps.panScanRatio;
+    }
+    else
+    {
+        ps.aspectGeom.y = filmback.imageGeom.y;
+        ps.aspectGeom.x = ps.aspectGeom.y * ps.panScanRatio;
+    }
+    
+    //Adjust for lens squeeze
+    ps.aspectGeom.x *= camera.lensSqueezeRatio();
 
     ps.aspectGeom.x1 = filmback.imageGeom.x1+ ( ((ps.panScanOffset+1)/2)*(filmback.imageGeom.x-ps.aspectGeom.x) );
     ps.aspectGeom.x2 = ps.aspectGeom.x1+ps.aspectGeom.x;
-    ps.aspectGeom.y1 = portGeom.y - (ps.aspectGeom.y / 2);
-    ps.aspectGeom.y2 = portGeom.y + (ps.aspectGeom.y / 2);
+    ps.aspectGeom.y1 = portGeom.y - (ps.aspectGeom.y / 2.0f);
+    ps.aspectGeom.y2 = portGeom.y + (ps.aspectGeom.y / 2.0f);
 
     ps.aspectGeom.isValid = true;
     ps.safeActionGeom.isValid = false;
@@ -1063,536 +1155,431 @@ bool spReticleLoc::setInternalValueInContext(const  MPlug & plug,
     return false;
 }
 
-// Given two Geom instances, this calculates the mask area between them.
-//
-void spReticleLoc::drawMask( Geom g1, Geom g2, MColor color, bool sides )
+bool spReticleLoc::calcDynamicText(TextData *td, const int i)
 {
-    double z = -ncp;
-
-    // Turn off z-depth test
-    glDisable( GL_DEPTH_TEST );
-    glDepthMask( GL_FALSE );
-
-    glBegin( GL_QUADS );
-
-        glColor4f( color.r, color.g, color.b, 1-color.a );
-
-        // Bottom Mask
-        glVertex3d( g1.x1, g1.y1, z );
-        glVertex3d( g1.x2, g1.y1, z );
-        glVertex3d( g2.x2, g2.y1, z );
-        glVertex3d( g2.x1, g2.y1, z );
-
-        // Top Mask
-        glVertex3d( g2.x1, g2.y2, z );
-        glVertex3d( g2.x2, g2.y2, z );
-        glVertex3d( g1.x2, g1.y2, z );
-        glVertex3d( g1.x1, g1.y2, z );
-
-        if (sides)
-        {
-            // Left side mask
-            glVertex3d( g1.x1, g1.y1, z );
-            glVertex3d( g2.x1, g2.y1, z );
-            glVertex3d( g2.x1, g2.y2, z );
-            glVertex3d( g1.x1, g1.y2, z );
-
-            // right side mask
-            glVertex3d( g2.x2, g2.y1, z );
-            glVertex3d( g1.x2, g1.y1, z );
-            glVertex3d( g1.x2, g1.y2, z );
-            glVertex3d( g2.x2, g2.y2, z );
-        }
-
-    glEnd();
-
-    // Turn on z-depth test
-    glDepthMask( GL_TRUE );
-    glEnable( GL_DEPTH_TEST );
-}
-
-// This draws a single line between the specified points.
-//
-void spReticleLoc::drawLine(double x1, double x2, double y1, double y2,
-                             MColor color, bool stipple)
-{
-    double z = -ncp;
-
-    // Turn off z-depth test
-    glDisable( GL_DEPTH_TEST );
-    glDepthMask( GL_FALSE );
-
-    if (stipple)
-    {
-        glEnable (GL_LINE_STIPPLE);
-        glLineStipple(2,0x00FF);
-    }
-
-    glBegin( GL_LINES );
-
-        glColor4f( color.r, color.g, color.b, 1-color.a );
-
-        glVertex3d( x1, y1, z );
-        glVertex3d( x2, y2, z );
-
-    glEnd();
-
-    if (stipple)
-        glDisable (GL_LINE_STIPPLE);
-
-    // Turn on z-depth test
-    glDepthMask( GL_TRUE );
-    glEnable( GL_DEPTH_TEST );
-}
-
-// Given a Geom instance, this will draw a line connecting the points.
-// The argument side determines whether the sides will be drawn (the top
-// will always be drawn). The stipple argument specifies whether the line
-// should be solid or dashed/stippled.
-//
-void spReticleLoc::drawLines( Geom g, MColor color, bool sides, bool stipple)
-{
-    double z = -ncp;
-
-    //Turn off z-depth test
-    glDisable( GL_DEPTH_TEST );
-    glDepthMask( GL_FALSE );
-
-    if (stipple)
-    {
-        glEnable (GL_LINE_STIPPLE);
-        glLineStipple(2,0x00FF);
-    }
-
-    GLenum mode = ( sides ) ? GL_LINE_LOOP : GL_LINES;
-
-    glBegin( mode );
-
-        glColor4f( color.r, color.g, color.b, 1-color.a );
-
-        glVertex3d( g.x1, g.y1, z );
-        glVertex3d( g.x2, g.y1, z );
-        glVertex3d( g.x2, g.y2, z );
-        glVertex3d( g.x1, g.y2, z );
-
-    glEnd( );
-
-    if (stipple)
-        glDisable (GL_LINE_STIPPLE);
-
-    //Turn on z-depth test
-    glDepthMask( GL_TRUE );
-    glEnable( GL_DEPTH_TEST );
-}
-
-// This function uses Maya's built-in function to draw text. At somepoint
-// I hope to use glut or glFT to draw text.
-//
-void spReticleLoc::drawText(MString text, double tx, double ty,
-                             MColor textColor, M3dView::TextPosition textAlign,
-                             M3dView & view)
-{
-    // Turn off z-depth test
-    glDisable( GL_DEPTH_TEST );
-    glDepthMask( GL_FALSE );
-
-    MPoint textPos = getPoint((float)tx, (float)ty, view);
-    glColor4f( textColor.r, textColor.g, textColor.b, 1-textColor.a );
-    view.drawText(text, textPos, textAlign);
-    glFlush(); // added by sjt@sjt.is (May 2010).
-
-    // Turn on z-depth test
-    glDepthMask( GL_TRUE );
-    glEnable( GL_DEPTH_TEST );
-}
-
-void spReticleLoc::drawCustomTextElements(M3dView & view)
-{
-    TextData td;
     char buff[255];
+    
+    switch (td->textType)
+    {
+        case 0:						//String
+            break;
+        case 1:						//Lens
+            if (td->textStr == "")
+                td->textStr = MString("%1.2f mm");
+            
+            sprintf(buff,td->textStr.asChar(),camera.focalLength() );
+            td->textStr = MString(buff);
+            break;
+        case 2:						//Camera
+            if (td->textStr == "")
+                td->textStr = camera.name();
+            else
+            {
+                sprintf(buff,td->textStr.asChar(),camera.name().asChar() );
+                td->textStr = MString(buff);
+            }
+            break;
+        case 3:						//Frame
+        {
+            MTime time;
+            MPlug p = MPlug ( thisNode, Time );
+            if (p.isNull() == false && p.isConnected() == false)
+            {
+                MString cmd = "connectAttr time1.o "+p.name();
+                MGlobal::executeCommand(cmd);
+            }
+            
+            MStatus status = p.getValue(time);
+            if (!status)
+            {
+                status.perror("spReticleLoc::calcDynamicText get time");
+                return false;
+            }
+            
+            if (td->textStr == "")
+                td->textStr = MString("%04.0f");
+            
+            sprintf(buff,td->textStr.asChar(),time.value() );
+            td->textStr = MString(buff);
+            break;
+        }
+        case 4:						//Aspect Ratio
+        {
+            int level = td->textARLevel;
+            if (level < 0 || level >= numAspectRatios)
+            {
+                MGlobal::displayError( name() + " invalid text level (" + level + ") for text item " + i);
+                return false;
+            }
+            
+            if (td->textStr == "")
+                td->textStr = MString("%1.3f");
+            
+            sprintf(buff,td->textStr.asChar(),ars[level].aspectRatio );
+            td->textStr = MString(buff);
+            break;
+        }
+        case 5:						//Maximum Distance
+            if (options.maximumDistance <= 0)
+                return false;
+            
+            if (td->textStr == "")
+                td->textStr = MString("max. dist %1.0f");
+            
+            //textColor = (maximumDist >= options.maximumDistance) ? MColor(1,1,1,0) : textColor;
+            sprintf(buff, td->textStr.asChar(), maximumDist );
+            td->textStr = MString(buff);
+            break;
+        case 6:						//Projection Gate
+        {
+            if (!filmback.displayProjGate)
+                return false;
+            
+            double aspectRatio = (filmback.horizontalProjectionGate/filmback.verticalProjectionGate);
+            
+            if (td->textStr == "")
+                td->textStr = MString("%1.3f");
+            
+            sprintf(buff, td->textStr.asChar(), aspectRatio);
+            td->textStr = MString(buff);
+            break;
+        }
+        case 7:						//Show
+        {
+            if (td->textStr == "")
+                td->textStr = MString("%s");
+            
+            sprintf(buff, td->textStr.asChar(), getenv(SHOW_ENV_VAR));
+            td->textStr = MString(buff);
+            break;
+        }
+        case 8:						//Show
+        {
+            if (td->textStr == "")
+                td->textStr = MString("%s");
+            
+            sprintf(buff, td->textStr.asChar(),  getenv(SHOT_ENV_VAR));
+            td->textStr = MString(buff);
+            break;
+        }
+        case 9:						//Show/Shot
+        {
+            if (td->textStr == "")
+                td->textStr = MString("%s/%s");
+            
+            sprintf(buff, td->textStr.asChar(), getenv(SHOW_ENV_VAR),getenv(SHOT_ENV_VAR));
+            td->textStr = MString(buff);
+            break;
+        }
+        case 10:						//Frame Start
+        {
+            if (td->textStr == "")
+                td->textStr = MString("%s");
+            
+            sprintf(buff, td->textStr.asChar(),  getenv(FRAME_START_ENV_VAR));
+            td->textStr = MString(buff);
+            break;
+        }
+        case 11:						//Frame End
+        {
+            if (td->textStr == "")
+                td->textStr = MString("%s");
+            
+            sprintf(buff, td->textStr.asChar(),  getenv(FRAME_END_ENV_VAR));
+            td->textStr = MString(buff);
+            break;
+        }
+        case 12:						//Frame Range
+        {
+            if (td->textStr == "")
+                td->textStr = MString("%s-%s");
+            
+            sprintf(buff, td->textStr.asChar(), getenv(FRAME_START_ENV_VAR), getenv(FRAME_END_ENV_VAR));
+            td->textStr = MString(buff);
+            break;
+        }
+        case 13:						//User
+        {
+            if (td->textStr == "")
+                td->textStr = MString("%s");
+            
+            sprintf(buff, td->textStr.asChar(), getenv("USER"));
+            td->textStr = MString(buff);
+            break;
+        }
+        case 14:						//Current File
+        {
+            if (td->textStr == "")
+                td->textStr = MString("%s");
+            
+            sprintf(buff, td->textStr.asChar(), MFileIO::currentFile().asChar() );
+            td->textStr = MString(buff);
+            break;
+        }
+        case 15:						//Path
+        {
+            if (td->textStr == "")
+                td->textStr = MString("%s");
+            
+            MFileObject fo;
+            fo.setFullName(MFileIO::currentFile());
+            sprintf(buff, td->textStr.asChar(), fo.path().asChar() );
+            td->textStr = MString(buff);
+            break;
+        }
+        case 16:						//Path
+        {
+            if (td->textStr == "")
+                td->textStr = MString("%s");
+            
+            MFileObject fo;
+            fo.setFullName(MFileIO::currentFile());
+            sprintf(buff, td->textStr.asChar(), fo.name().asChar() );
+            td->textStr = MString(buff);
+            break;
+        }
+        case 17:						//Pan Scan Aspect Ratio
+            if (td->textStr == "")
+                td->textStr = MString("%1.2f");
+            
+            sprintf(buff, td->textStr.asChar(), panScan.panScanRatio );
+            td->textStr = MString(buff);
+            break;
+        case 18:						//Pan Scan Offset
+            if (td->textStr == "")
+                td->textStr = MString("%1.2f");
+            
+            sprintf(buff, td->textStr.asChar(), panScan.panScanOffset );
+            td->textStr = MString(buff);
+            break;
+        case 19:						//Safe Action
+            if (td->textStr == "")
+                td->textStr = "safe action";
+            break;
+        case 20:						//Safe Title
+            if (td->textStr == "")
+                td->textStr = "safe title";
+            break;
+        default:
+            MGlobal::displayError( name() + " invalid text type for text item " + i);
+            return false;
+    }
+    
+    return true;
+}
 
+bool spReticleLoc::getTextLevelGeometry(TextData *td, Geom &g, const int i)
+{
+    switch (td->textLevel)
+    {
+        case 0:
+            g = portGeom;
+            break;
+        case 1:
+            g = pad.padGeom;
+            break;
+        case 2:
+            {
+                switch (td->textType)
+                {
+                    case 19:
+                        if (!filmback.safeActionGeom.isValid)
+                            calcFilmbackSafeActionGeom();
+                        g = filmback.safeActionGeom;
+                        break;
+                    case 20:
+                        if (!filmback.safeTitleGeom.isValid)
+                            calcFilmbackSafeTitleGeom();
+                        g = filmback.safeTitleGeom;
+                        break;
+                    default:
+                        g = filmback.filmbackGeom;
+                        break;
+                }
+            }
+            break;
+        case 3:
+            if (!filmback.displayProjGate)
+            {
+                MGlobal::displayError( name() + " cannot anchor text item " + i + " to undisplayed projection mask");
+                return false;
+            }
+            g = filmback.projGeom;
+            break;
+        case 4:
+            {
+                int level = td->textARLevel;
+                if (level < 0 || level >= numAspectRatios)
+                {
+                    MGlobal::displayError( name() + " invalid aspect ratio level (" + td->textARLevel + ") for text item " + i);
+                    return false;
+                }
+                
+                if (!ars[level].aspectGeom.isValid)
+                    return false;
+                
+                switch (td->textType)
+                {
+                    case 19:
+                        if (!ars[level].safeActionGeom.isValid)
+                            calcSafeActionGeom(ars[level]);
+                        g = ars[level].safeActionGeom;
+                        break;
+                    case 20:
+                        if (!ars[level].safeTitleGeom.isValid)
+                            calcSafeTitleGeom(ars[level]);
+                        g = ars[level].safeTitleGeom;
+                        break;
+                    default:
+                        g = ars[level].aspectGeom;
+                        break;
+                }
+            }
+            break;
+        case 5:
+            {
+                if (!panScan.aspectGeom.isValid)
+                    calcPanScanGeom( panScan );
+                
+                switch (td->textType)
+                {
+                    case 19:
+                        if (!panScan.safeActionGeom.isValid)
+                            calcSafeActionGeom(panScan);
+                        g = panScan.safeActionGeom;
+                        break;
+                    case 20:
+                        if (!panScan.safeTitleGeom.isValid)
+                            calcSafeTitleGeom(panScan);
+                        g = panScan.safeTitleGeom;
+                        break;
+                    default:
+                        g = panScan.aspectGeom;
+                        break;
+                }
+            }
+            break;
+        default:
+            MGlobal::displayError( name() + " invalid text anchor for text item " + i);
+            break;
+    }
+    
+    return true;
+}
+
+bool spReticleLoc::calcTextPosition(TextData *td, const Geom &g, double &x, double &y, const int i)
+{
+    switch (td->textPosRel)
+    {
+        case 0:						//Bottom Left
+            x = g.x1;
+            y = g.y1;
+            break;
+        case 1:						//Bottom Center
+            x = (g.x1 + g.x2 ) / 2;
+            y = g.y1;
+            break;
+        case 2:						//Bottom Right
+            x = g.x2;
+            y = g.y1;
+            break;
+        case 3:						//Middle Left
+            x = g.x1;
+            y = (g.y1 + g.y2 ) / 2;
+            break;
+        case 4:						//Center
+            x = (g.x1 + g.x2 ) / 2;
+            y = (g.y1 + g.y2 ) / 2;
+            break;
+        case 5:						//Middle Right
+            x = g.x2;
+            y = (g.y1 + g.y2 ) / 2;
+            break;
+        case 6:						//Top Left
+            x = g.x1;
+            y = g.y2;
+            break;
+        case 7:						//Top Center
+            x = (g.x1 + g.x2 ) / 2;
+            y = g.y2;
+            break;
+        case 8:						//Top Right
+            x = g.x2;
+            y = g.y2;
+            break;
+        default:
+            MGlobal::displayError( name() + " invalid text relative position (" + td->textPosRel + ") for text item " + i);
+            return false;
+    }
+    
+    return true;
+}
+
+void spReticleLoc::drawCustomTextElements(GPURenderer* renderer)
+{
+    if (!text.size())
+        return;
+
+    TextData *td;
+
+    // Make sure everything is ready for drawing text
+    renderer->enableTextRendering();
+
+    Geom g;
     for (int i = 0; i < (int)text.size(); i++)
     {
-        td = text[i];
+        td = &text[i];
+
+        // If the text is not enabled, skip it
+        if (!td->textEnabled)
+            continue;
 
         MColor textColor = options.textColor;
 
-        switch (td.textType)
-        {
-            case 0:						//String
-                break;
-            case 1:						//Lens
-                if (td.textStr == "")
-                    td.textStr = MString("%1.2f mm");
-
-                sprintf(buff,td.textStr.asChar(),camera.focalLength() );
-                td.textStr = MString(buff);
-                break;
-            case 2:						//Camera
-                if (td.textStr == "")
-                    td.textStr = camera.name();
-                else
-                {
-                    sprintf(buff,td.textStr.asChar(),camera.name().asChar() );
-                    td.textStr = MString(buff);
-                }
-                break;
-            case 3:						//Frame
-            {
-                MTime time;
-                MPlug p = MPlug ( thisNode, Time );
-                if (p.isNull() == false && p.isConnected() == false)
-                {
-                    MString cmd = "connectAttr time1.o "+p.name();
-                    MGlobal::executeCommand(cmd);
-                }
-                McheckVoid ( p.getValue ( time  ), "spReticleLoc::drawCustomTextElements get time");
-
-                if (td.textStr == "")
-                    td.textStr = MString("%04.0f");
-
-                sprintf(buff,td.textStr.asChar(),time.value() );
-                td.textStr = MString(buff);
-                break;
-            }
-            case 4:						//Aspect Ratio
-            {
-                int level = td.textARLevel;
-                if (level < 0 || level >= numAspectRatios)
-                {
-                    MGlobal::displayError( name() + " invalid text level (" + level + ") for text item " + i);
-                    continue;
-                }
-
-                if (td.textStr == "")
-                    td.textStr = MString("%1.3f");
-
-                sprintf(buff,td.textStr.asChar(),ars[level].aspectRatio );
-                td.textStr = MString(buff);
-                break;
-            }
-            case 5:						//Maximum Distance
-                if (options.maximumDistance <= 0)
-                    continue;
-
-                if (td.textStr == "")
-                    td.textStr = MString("max. dist %1.0f");
-
-                textColor = (maximumDist >= options.maximumDistance) ? MColor(1,1,1,0) : textColor;
-                sprintf(buff, td.textStr.asChar(), maximumDist );
-                td.textStr = MString(buff);
-                break;
-            case 6:						//Projection Gate
-            {
-                if (!filmback.displayProjGate)
-                    continue;
-
-                double aspectRatio = (filmback.horizontalProjectionGate/filmback.verticalProjectionGate);
-
-                if (td.textStr == "")
-                    td.textStr = MString("%1.3f");
-
-                sprintf(buff, td.textStr.asChar(), aspectRatio);
-                td.textStr = MString(buff);
-                break;
-            }
-            case 7:						//Show
-            {
-                if (td.textStr == "")
-                    td.textStr = MString("%s");
-
-                sprintf(buff, td.textStr.asChar(), getenv("SHOW"));
-                td.textStr = MString(buff);
-                break;
-            }
-            case 8:						//Show
-            {
-                if (td.textStr == "")
-                    td.textStr = MString("%s");
-
-                sprintf(buff, td.textStr.asChar(),  getenv("SHOT"));
-                td.textStr = MString(buff);
-                break;
-            }
-            case 9:						//Show/Shot
-            {
-                if (td.textStr == "")
-                    td.textStr = MString("%s/%s");
-
-                sprintf(buff, td.textStr.asChar(), getenv("SHOW"),getenv("SHOT"));
-                td.textStr = MString(buff);
-                break;
-            }
-            case 10:						//Frame Start
-            {
-                if (td.textStr == "")
-                    td.textStr = MString("%s");
-
-                sprintf(buff, td.textStr.asChar(),  getenv("FS"));
-                td.textStr = MString(buff);
-                break;
-            }
-            case 11:						//Frame End
-            {
-                if (td.textStr == "")
-                    td.textStr = MString("%s");
-
-                sprintf(buff, td.textStr.asChar(),  getenv("FE"));
-                td.textStr = MString(buff);
-                break;
-            }
-            case 12:						//Frame Range
-            {
-                if (td.textStr == "")
-                    td.textStr = MString("%s-%s");
-
-                sprintf(buff, td.textStr.asChar(), getenv("FS"), getenv("FE"));
-                td.textStr = MString(buff);
-                break;
-            }
-            case 13:						//User
-            {
-                if (td.textStr == "")
-                    td.textStr = MString("%s");
-
-                sprintf(buff, td.textStr.asChar(), getenv("USER"));
-                td.textStr = MString(buff);
-                break;
-            }
-            case 14:						//Current File
-            {
-                if (td.textStr == "")
-                    td.textStr = MString("%s");
-
-                sprintf(buff, td.textStr.asChar(), MFileIO::currentFile().asChar() );
-                td.textStr = MString(buff);
-                break;
-            }
-            case 15:						//Path
-            {
-                if (td.textStr == "")
-                    td.textStr = MString("%s");
-
-                MFileObject fo;
-                fo.setFullName(MFileIO::currentFile());
-                sprintf(buff, td.textStr.asChar(), fo.path().asChar() );
-                td.textStr = MString(buff);
-                break;
-            }
-            case 16:						//Path
-            {
-                if (td.textStr == "")
-                    td.textStr = MString("%s");
-
-                MFileObject fo;
-                fo.setFullName(MFileIO::currentFile());
-                sprintf(buff, td.textStr.asChar(), fo.name().asChar() );
-                td.textStr = MString(buff);
-                break;
-            }
-            case 17:						//Pan Scan Aspect Ratio
-                if (td.textStr == "")
-                    td.textStr = MString("%1.2f");
-
-                sprintf(buff, td.textStr.asChar(), panScan.panScanRatio );
-                td.textStr = MString(buff);
-                break;
-            case 18:						//Pan Scan Offset
-                if (td.textStr == "")
-                    td.textStr = MString("%1.2f");
-
-                sprintf(buff, td.textStr.asChar(), panScan.panScanOffset );
-                td.textStr = MString(buff);
-                break;
-            case 19:						//Safe Action
-                if (td.textStr == "")
-                    td.textStr = "safe action";
-                break;
-            case 20:						//Safe Title
-                if (td.textStr == "")
-                    td.textStr = "safe title";
-                break;
-            default:
-                MGlobal::displayError( name() + " invalid text type for text item " + i);
-                continue;
-        }
+        // Process dynamic text
+        if (td->textType && !calcDynamicText(td, i))
+            continue;
 
         // Determine the level geometry
-        Geom g;
-        switch (td.textLevel)
-        {
-            case 0:
-                g = portGeom;
-                break;
-            case 1:
-                g = pad.padGeom;
-                break;
-            case 2:
-                {
-                    switch (td.textType)
-                    {
-                        case 19:
-                            if (!filmback.safeActionGeom.isValid)
-                                calcFilmbackSafeActionGeom();
-                            g = filmback.safeActionGeom;
-                            break;
-                        case 20:
-                            if (!filmback.safeTitleGeom.isValid)
-                                calcFilmbackSafeTitleGeom();
-                            g = filmback.safeTitleGeom;
-                            break;
-                        default:
-                            g = filmback.filmbackGeom;
-                            break;
-                    }
-                }
-                break;
-            case 3:
-                if (!filmback.displayProjGate)
-                {
-                    MGlobal::displayError( name() + " cannot anchor text item " + i + " to undisplayed projection mask");
-                    continue;
-                }
-                g = filmback.projGeom;
-                break;
-            case 4:
-                {
-                    int level = td.textARLevel;
-                    if (level < 0 || level >= numAspectRatios)
-                    {
-                        MGlobal::displayError( name() + " invalid aspect ratio level (" + td.textARLevel + ") for text item " + i);
-                        continue;
-                    }
-
-                    if (!ars[level].aspectGeom.isValid)
-                        continue;
-
-                    switch (td.textType)
-                    {
-                        case 19:
-                            if (!ars[level].safeActionGeom.isValid)
-                                calcSafeActionGeom(ars[level]);
-                            g = ars[level].safeActionGeom;
-                            break;
-                        case 20:
-                            if (!ars[level].safeTitleGeom.isValid)
-                                calcSafeTitleGeom(ars[level]);
-                            g = ars[level].safeTitleGeom;
-                            break;
-                        default:
-                            g = ars[level].aspectGeom;
-                            break;
-                    }
-                }
-                break;
-            case 5:
-                {
-                    if (!panScan.aspectGeom.isValid)
-                        calcPanScanGeom( panScan );
-
-                    switch (td.textType)
-                    {
-                        case 19:
-                            if (!panScan.safeActionGeom.isValid)
-                                calcSafeActionGeom(panScan);
-                            g = panScan.safeActionGeom;
-                            break;
-                        case 20:
-                            if (!panScan.safeTitleGeom.isValid)
-                                calcSafeTitleGeom(panScan);
-                            g = panScan.safeTitleGeom;
-                            break;
-                        default:
-                            g = panScan.aspectGeom;
-                            break;
-                    }
-                }
-                break;
-            default:
-                MGlobal::displayError( name() + " invalid text anchor for text item " + i);
-                break;
-        }
+        if (!getTextLevelGeometry(td, g, i))
+            continue;
 
         // Determine the position
         double x,y;
-
-        switch (td.textPosRel)
-        {
-            case 0:						//Bottom Left
-                x = g.x1;
-                y = g.y1;
-                break;
-            case 1:						//Bottom Center
-                x = (g.x1 + g.x2 ) / 2;
-                y = g.y1;
-                break;
-            case 2:						//Bottom Right
-                x = g.x2;
-                y = g.y1;
-                break;
-            case 3:						//Middle Left
-                x = g.x1;
-                y = (g.y1 + g.y2 ) / 2;
-                break;
-            case 4:						//Center
-                x = (g.x1 + g.x2 ) / 2;
-                y = (g.y1 + g.y2 ) / 2;
-                break;
-            case 5:						//Middle Right
-                x = g.x2;
-                y = (g.y1 + g.y2 ) / 2;
-                break;
-            case 6:						//Top Left
-                x = g.x1;
-                y = g.y2;
-                break;
-            case 7:						//Top Center
-                x = (g.x1 + g.x2 ) / 2;
-                y = g.y2;
-                break;
-            case 8:						//Top Right
-                x = g.x2;
-                y = g.y2;
-                break;
-            default:
-                MGlobal::displayError( name() + " invalid text relative position (" + td.textPosRel + ") for text item " + i);
-                continue;
-        }
-
-        // Add text position as offset
-        x += td.textPosX;
-        y += td.textPosY;
+        if (!calcTextPosition(td,g,x,y,i))
+            continue;
 
         // Actually draw the text
-        drawText( td.textStr, x, y, td.textColor, (M3dView::TextPosition)td.textAlign, view);
+        renderer->drawText( td, x, y);
     }
+
+    // Disable text rendering
+    renderer->disableTextRendering();
 }
 
-// This is the main function which draws the locator. It is called
-// by Maya whenever a 3D view needs to be refreshed.
+// This updates the data in order to get things ready for drawing
 //
-void spReticleLoc::draw(M3dView & view, const MDagPath & path,
-                         M3dView::DisplayStyle style,
-                         M3dView::DisplayStatus status)
+bool spReticleLoc::prepForDraw(const MObject & node, const MDagPath & path, const MDagPath & cameraPath)
 {
     MStatus stat;
     MPlug p;
-    thisNode = thisMObject();
 
     // Initialize maximumDist
     maximumDist = 0;
 
+#if SOURCE_MEL_SCRIPT
     // If this is the first time it's being draw, load the default values
-    if (loadDefault == 1)
+    if (loadDefault)
     {
         MString tag;
         p = MPlug ( thisNode, Tag );
-        McheckVoid ( p.getValue ( tag  ), "spReticleLoc::draw get tag");
-
-        MString cmd = "if (exists(\"spReticleLocSetDefault\")) spReticleLocSetDefault(\""+name()+"\",\""+tag+"\")";
+        McheckStatus ( p.getValue ( tag  ), "spReticleLoc::draw get tag");
+        
+        MString cmd = "if (exists(\"" SOURCE_MEL_METHOD "\")) "SOURCE_MEL_METHOD"(\""+path.partialPathName()+"\",\""+tag+"\")";
         MGlobal::executeCommand(cmd);
-        loadDefault = 0;
+        loadDefault = false;
     }
+#endif
 
     // Get options
     if (needRefresh)
@@ -1600,37 +1587,75 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
 
     // Drawing not enabled, return
     if (!options.drawingEnabled)
-        return;
-
-    // Get the dagPath, node and function set for the currently displaying camera
-    MDagPath cameraPath;
-    view.getCamera(cameraPath);
+        return false;
 
     // Set the MFnCamera to the current camera
     camera.setObject( cameraPath );
 
     // If camera is orthographic, then return
     if (camera.isOrtho()) 
-        return;
+        return false;
 
-    // Using useSpReticle Filter, check camera for attribute
-    if (options.useSpRet)
+    //Default value to false
+    bool useReticle = false;
+
+    //
+    switch (options.cameraFilterMode)
     {
-        //Default value to false
-        int useReticle = false;
+        // Draw in all cameras
+        case 0:
+            break;
 
-        // Find the useSpReticle plug on the camera node
-        MPlug useReticlePlug = camera.findPlug("useSpReticle", &stat);
-
-        // If the plug is valid (not null) get the current value
-        if (!useReticlePlug.isNull())
+        // Using CAMERA_ATTR Filter, check camera for CAMERA_ATTR attribute and draw if true
+        case 1:
         {
-            McheckVoid ( useReticlePlug.getValue( useReticle ), "spReticleLoc::draw get useSpReticle plug");
+            // Find the CAMERA_ATTR plug on the camera node
+            MPlug useReticlePlug = camera.findPlug(CAMERA_ATTR, &stat);
+
+            // If the plug is valid (not null) get the current value
+            if (!useReticlePlug.isNull())
+            {
+                McheckStatus ( useReticlePlug.getValue( useReticle ), "spReticleLoc::draw get CAMERA_ATTR plug");
+            }
+
+            // If camera is not set to use reticle then return
+            if (!useReticle)
+            {
+                return false;
+            }
+
+            break;
         }
 
-        // If camera is not set to use reticle then return
-        if (!useReticle)
-            return;
+        // Only display in connected cameras
+        case 2:
+        {
+            MPlug cameras(thisNode, Cameras);
+        
+            MPlugArray cameraPlugs;
+
+            MObject cameraObj = camera.object();
+            for (unsigned i = 0; i < cameras.numElements() && !useReticle; i++)
+            {
+                cameras[i].connectedTo(cameraPlugs,true,false,&stat);
+                if ( cameraPlugs.length() == 0)
+                    continue;
+
+                for(unsigned j = 0; j < cameraPlugs.length(); j++)
+                {
+                    if ( cameraPlugs[j].node() == cameraObj )
+                    {
+                        useReticle = true;
+                        break;
+                    }
+                }
+            }
+
+            if ( !useReticle )
+                return false;
+
+            break;
+        }
     }
 
     // Get the camera position
@@ -1655,22 +1680,11 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
     overscan = (options.useOverscan) ? 1.0 : camera.overscan();
     ncp = camera.nearClippingPlane() + 0.001;
 
-    // Get the view attributes that impact drawing
-    portWidth = double ( view.portWidth() );
-    portHeight = double ( view.portHeight() );
-
     // Get the worldInverseMatrix
     wim = getMatrix("worldInverseMatrix");
 
-    // Calculate the port geometry
-    calcPortGeom();
-
-    // Update text data
-    if (needToUpdateTextData() || needRefresh)
-    {
-        // Get the text data
-        getTextData();
-    }
+    // Get the text data
+    getTextData();
 
     // Update aspect ratios
     if (needToUpdateAspectRatios() || needRefresh)
@@ -1704,6 +1718,19 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
         // Reset need refresh
         needRefresh = false;
     }
+	
+	return true;
+}
+
+// This is the main function which draws the locator.
+//
+void spReticleLoc::drawBase(int width, int height, GPURenderer* renderer)
+{
+	portWidth = double(width);
+	portHeight = double(height);
+	
+    // Calculate the port geometry
+    calcPortGeom();
 
     // Peform the calculations necessary to define the filmback geometry.
     calcFilmbackGeom();
@@ -1733,58 +1760,43 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
             calcAspectGeom( ars[i] );
         }
     }
+    
+    // Set the filmback for the renderer
+    renderer->setFilmback(&filmback);
 
-    // Begin drawing locator
-    view.beginGL();
-
-    // Get current line settings
-    //glLineWidth(1);
-
-    // Store all of the openGL attribute settings
-    glPushAttrib( GL_ALL_ATTRIB_BITS );
-
-    // Go into 2D ortho mode
-    glMatrixMode( GL_MODELVIEW );
-    glPushMatrix();
-
-    glMatrixMode( GL_PROJECTION );
-    glPushMatrix();
-    glLoadIdentity();
-    glOrtho(
-        0.0, (GLdouble) view.portWidth(),
-        0.0, (GLdouble) view.portHeight(),
-        camera.nearClippingPlane(), camera.farClippingPlane()
-        //0.0, camera.farClippingPlane()
-    );
-    glMatrixMode( GL_MODELVIEW );
-    glLoadIdentity();
-
-    // Turn on openGL blending for transparency
-    glEnable(GL_BLEND);
-
-    // Store the current blend types
-    GLint blendAttrs[2];
-    glGetIntegerv(GL_BLEND_SRC, & blendAttrs[0]);
-    glGetIntegerv(GL_BLEND_DST, & blendAttrs[1]);
-
-    // Set the blending function
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
+    // Get everything setup for rendering
+    renderer->prepareForDraw(portWidth, portHeight);
+    
     // create variable to store what the first geometry object to draw aspect ratios to
-    Geom aspectContainerGeom;
+    Geom aspectContainerGeom = portGeom;
+    Geom filmbackGeom = filmback.filmbackGeom;
+
+    // Draw the filmback
+    if ( filmback.displayFilmGate )
+    {
+        // Draw filmback Mask
+        if ( filmback.displayFilmGate == 3 )
+        {
+            renderer->drawMask(aspectContainerGeom, filmbackGeom, filmback.filmbackGeom.maskColor, 1);
+            aspectContainerGeom = filmback.filmbackGeom;
+        }
+        
+        // Draw filmback Line
+        renderer->drawLines(filmback.filmbackGeom, filmback.filmbackGeom.lineColor, 1, filmback.displayFilmGate == 2);
+        
+        // Draw Sound Area Line
+        if ( filmback.soundTrackWidth > EPSILON )
+            renderer->drawLine(filmback.imageGeom.x1, filmback.imageGeom.x1, filmback.imageGeom.y1, filmback.imageGeom.y2, filmback.imageGeom.lineColor, 0 );
+    }
 
     // Draw the padGeomMask
     if (pad.usePad && pad.isPadded)
     {
-        if (pad.displayMode == 2)
-            drawMask(portGeom, pad.padGeom, pad.padGeom.maskColor, true);
+        if (pad.displayMode == 3)
+            renderer->drawMask(aspectContainerGeom, pad.padGeom, pad.padGeom.maskColor, true);
         aspectContainerGeom = pad.padGeom;
     }
-    else
-    {
-        aspectContainerGeom = portGeom;
-    }
-
+    
     // Draw all the aspectRatios
 
     // Draw the masks first
@@ -1793,7 +1805,7 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
     {
         ar = ars[i];
         // Draw the masks as Quads
-        if (ar.displayMode == 2)
+        if (ar.displayMode == 3)
         {
             Geom g = (i == 0)?aspectContainerGeom:ars[i-1].aspectGeom;
             MColor maskColor = ar.aspectGeom.maskColor;
@@ -1811,7 +1823,23 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
                 }
             }
             //drawMask(g, ar.aspectGeom, maskColor, (i == 0 && !(pad.usePad && pad.isPadded)) );
-            drawMask(g, ar.aspectGeom, maskColor, i == 0);
+            renderer->drawMask(g, ar.aspectGeom, maskColor, i == 0);
+            
+            if ( ar.displaySafeAction == 3 )
+            {
+                float sf = (ar.displaySafeTitle == 3) ? 0.66 : 0.5;
+                MColor c = MColor(maskColor.r,maskColor.g,maskColor.b,1+((maskColor.a-1) * sf));
+                renderer->drawMask(ar.aspectGeom,ar.safeActionGeom,c,true);
+            }
+            if ( ar.displaySafeTitle == 3 )
+            {
+                float sf = (panScan.displaySafeAction == 3) ? 0.33 : 0.5;
+                MColor c = MColor(maskColor.r,maskColor.g,maskColor.b,1+((maskColor.a-1) * sf));
+                if ( ar.displaySafeAction == 3 )
+                    renderer->drawMask(ar.safeActionGeom,ar.safeTitleGeom,c,true);
+                else
+                    renderer->drawMask(ar.aspectGeom,ar.safeTitleGeom,c,true);
+            }
         }
     }
 
@@ -1822,15 +1850,15 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
 
         if (ar.displayMode != 0)
         {
-            bool sides = (i == 0 || ar.aspectGeom.x != ars[i].aspectGeom.x);
-            drawLines(ar.aspectGeom, ar.aspectGeom.lineColor, sides, 0);
+            bool sides = (i == 0 || (fabs(ar.aspectGeom.x - ars[i].aspectGeom.x) > EPSILON) );
+            renderer->drawLines(ar.aspectGeom, ar.aspectGeom.lineColor, sides, ar.displayMode == 2);
             // Draw safe action
             if (ar.displaySafeAction)
-                drawLines( ar.safeActionGeom, ar.safeActionGeom.lineColor, 1, 1);
+                renderer->drawLines( ar.safeActionGeom, ar.safeActionGeom.lineColor, true, ar.displaySafeAction == 2);
 
             // Draw safe title
             if (ar.displaySafeTitle)
-                drawLines( ar.safeTitleGeom, ar.safeTitleGeom.lineColor, 1, 1);
+                renderer->drawLines( ar.safeTitleGeom, ar.safeTitleGeom.lineColor, true, ar.displaySafeTitle == 2);
         }
     }
 
@@ -1838,136 +1866,221 @@ void spReticleLoc::draw(M3dView & view, const MDagPath & path,
     if ( panScan.displayMode != 0 )
     {
         if (panScan.displayMode == 2)
-            drawMask(ars[0].aspectGeom, panScan.aspectGeom, panScan.aspectGeom.maskColor, true );
-        drawLines(panScan.aspectGeom, panScan.aspectGeom.lineColor, 1, 0);
-
+        {
+            renderer->drawMask(filmback.imageGeom, panScan.aspectGeom, panScan.aspectGeom.maskColor, true, false );
+            
+            Geom g = panScan.aspectGeom;
+            
+            if ( panScan.displaySafeAction == 3 )
+            {
+                float sf = (panScan.displaySafeTitle == 3) ? 0.66 : 0.5;
+                MColor c = MColor(panScan.aspectGeom.maskColor.r,panScan.aspectGeom.maskColor.g,panScan.aspectGeom.maskColor.b,1+((panScan.aspectGeom.maskColor.a-1) * sf));
+                renderer->drawMask(panScan.aspectGeom,panScan.safeActionGeom, c, true );
+                g = panScan.safeActionGeom;
+            }
+            
+            if ( panScan.displaySafeTitle == 3 )
+            {
+                float sf = (panScan.displaySafeAction == 3) ? 0.33 : 0.5;
+                MColor c = MColor(panScan.aspectGeom.maskColor.r,panScan.aspectGeom.maskColor.g,panScan.aspectGeom.maskColor.b,1+((panScan.aspectGeom.maskColor.a-1) * sf));
+                renderer->drawMask(g,panScan.safeTitleGeom, c, true );
+            }
+        }
+        
+        renderer->drawLines(panScan.aspectGeom, panScan.aspectGeom.lineColor, 1, 0);
+        
         // Draw safe action
         if (panScan.displaySafeAction)
         {
-            drawLines( panScan.safeActionGeom, panScan.safeActionGeom.lineColor, 1, 1);
+            renderer->drawLines( panScan.safeActionGeom, panScan.safeActionGeom.lineColor, true, panScan.displaySafeAction == 2);
         }
 
         // Draw safe title
         if (panScan.displaySafeTitle)
         {
-            drawLines( panScan.safeTitleGeom, panScan.safeTitleGeom.lineColor, 1, 1);
+            renderer->drawLines( panScan.safeTitleGeom, panScan.safeTitleGeom.lineColor, true, panScan.displaySafeTitle == 2);
         }
-    }
-
-    // Draw the filmback
-    if ( filmback.displayFilmGate )
-    {
-        // Draw filmback
-        drawLines(filmback.filmbackGeom, filmback.filmbackGeom.lineColor, 1, 0);
-
-        // Draw Sound Area Line
-        if ( filmback.soundTrackWidth != 0 )
-            drawLine(filmback.imageGeom.x1, filmback.imageGeom.x1, filmback.imageGeom.y1, filmback.imageGeom.y2, filmback.imageGeom.lineColor, 0 );
-    }
-
-    // Draw filmback safe action
-    if (filmback.displaySafeAction)
-    {
-        drawLines( filmback.safeActionGeom, filmback.safeActionGeom.lineColor, 1, 1);
-    }
-
-    // Draw filmback safe title
-    if (filmback.displaySafeTitle)
-    {
-        drawLines( filmback.safeTitleGeom, filmback.safeTitleGeom.lineColor, 1, 1);
     }
 
     // Draw the projection gate
     if ( filmback.displayProjGate )
     {
-        drawLines(filmback.projGeom, filmback.projGeom.lineColor, 1, 1);
+        if ( filmback.displayProjGate == 3 )
+            renderer->drawMask(filmback.filmbackGeom, filmback.projGeom, filmback.projGeom.maskColor, 1);
+        
+        renderer->drawLines(filmback.projGeom, filmback.projGeom.lineColor, 1, filmback.displayProjGate == 2);
+    }
+
+    // Draw filmback safe action
+    if (filmback.displaySafeAction)
+    {
+        renderer->drawLines( filmback.safeActionGeom, filmback.safeActionGeom.lineColor, 1, filmback.displaySafeAction == 2);
+    }
+
+    // Draw filmback safe title
+    if (filmback.displaySafeTitle)
+    {
+        renderer->drawLines( filmback.safeTitleGeom, filmback.safeTitleGeom.lineColor, 1, filmback.displaySafeTitle == 2);
     }
 
     // Display horizontal line
     if ( options.displayLineH )
     {
-        drawLine( filmback.imageGeom.x1, filmback.imageGeom.x2, portGeom.y, portGeom.y, options.lineColor, 0 );
+        renderer->drawLine( filmback.imageGeom.x1, filmback.imageGeom.x2, portGeom.y, portGeom.y, options.lineColor, 0 );
     }
 
     // Display vertical line
     if ( options.displayLineV )
     {
         double cx = ( filmback.imageGeom.x1 + filmback.imageGeom.x2 ) / 2;
-        drawLine( cx, cx, filmback.imageGeom.y1, filmback.imageGeom.y2, options.lineColor, 0 );
+        renderer->drawLine( cx, cx, filmback.imageGeom.y1, filmback.imageGeom.y2, options.lineColor, 0 );
     }
 
     // Display Horizontal Thirds
     if ( options.displayThirdsH)
     {
-        Geom g = (numAspectRatios > 0)?ars[0].aspectGeom:portGeom;
+        Geom g = aspectContainerGeom;
         double y1 = g.y1+ ( ( g.y2 - g.y1 ) * 0.33 );
         double y2 = g.y1+ ( ( g.y2 - g.y1 ) * 0.66 );
-        drawLine( g.x1, g.x2, y1, y1, options.lineColor, 0 );
-        drawLine( g.x1, g.x2, y2, y2, options.lineColor, 0 );
+        renderer->drawLine( g.x1, g.x2, y1, y1, options.lineColor, 0 );
+        renderer->drawLine( g.x1, g.x2, y2, y2, options.lineColor, 0 );
     }
 
     // Display Vertical Thirds
     if ( options.displayThirdsV)
     {
-        Geom g = (numAspectRatios > 0)?ars[0].aspectGeom:portGeom;
+        Geom g = aspectContainerGeom;
         double x1 = g.x1+ ( ( g.x2 - g.x1 ) * 0.33 );
         double x2 = g.x1+ ( ( g.x2 - g.x1 ) * 0.66 );
-        drawLine( x1, x1, g.y1, g.y2, options.lineColor, 0 );
-        drawLine( x2, x2, g.y1, g.y2, options.lineColor, 0 );
+        renderer->drawLine( x1, x1, g.y1, g.y2, options.lineColor, 0 );
+        renderer->drawLine( x2, x2, g.y1, g.y2, options.lineColor, 0 );
     }
 
     // Display crosshair
     if ( options.displayCrosshair )
     {
         double cx = ( filmback.imageGeom.x1 + filmback.imageGeom.x2 ) / 2;
-        drawLine( cx-25, cx-5, portGeom.y, portGeom.y, options.lineColor, 0 );
-        drawLine( cx+25, cx+5, portGeom.y, portGeom.y, options.lineColor, 0 );
-        drawLine( cx, cx, portGeom.y-25, portGeom.y-5, options.lineColor, 0 );
-        drawLine( cx, cx, portGeom.y+25, portGeom.y+5, options.lineColor, 0 );
+        renderer->drawLine( cx-25, cx-5, portGeom.y, portGeom.y, options.lineColor, 0 );
+        renderer->drawLine( cx+25, cx+5, portGeom.y, portGeom.y, options.lineColor, 0 );
+        renderer->drawLine( cx, cx, portGeom.y-25, portGeom.y-5, options.lineColor, 0 );
+        renderer->drawLine( cx, cx, portGeom.y+25, portGeom.y+5, options.lineColor, 0 );
+    }
+    
+    // Display Field Guide
+    if ( options.displayFieldGuide)
+    {
+        //Calculate constants
+        int numLines = FIELDGUIDE_NUM_LINES;
+
+        double cx = ( filmback.imageGeom.x1 + filmback.imageGeom.x2 ) / 2.0;
+        double cy = ( filmback.imageGeom.y1 + filmback.imageGeom.y2 ) / 2.0;
+
+        double sx = (filmback.imageGeom.x / 2.0) / double(numLines+1);
+        double sy = (filmback.imageGeom.y / 2.0) / double(numLines+1);
+        
+        //If the filmback is not being drawn, then draw lines for it
+        if ( !filmback.displayFilmGate )
+            renderer->drawLines(filmback.filmbackGeom, options.lineColor, 1, 0);
+
+        //Draw field guide lines
+        for (int i = 1; i <= numLines; i++)
+        {
+            //Draw horizontal lines
+            double lx = sx * i;
+            double lx1 = filmback.imageGeom.x1 + lx;
+            double lx2 = filmback.imageGeom.x2 - lx;
+            
+            renderer->drawLine( lx1, lx1, filmback.imageGeom.y1, filmback.imageGeom.y2, options.lineColor, 0);
+            renderer->drawLine( lx2, lx2, filmback.imageGeom.y1, filmback.imageGeom.y2, options.lineColor, 0);
+            
+            //Draw vertical lines
+            double ly = sy * i;
+            double ly1 = filmback.imageGeom.y1 + ly;
+            double ly2 = filmback.imageGeom.y2 - ly;
+            
+            renderer->drawLine( filmback.imageGeom.x1, filmback.imageGeom.x2, ly1, ly1, options.lineColor, 0);
+            renderer->drawLine( filmback.imageGeom.x1, filmback.imageGeom.x2, ly2, ly2, options.lineColor, 0);
+        }
+
+        //Draw center lines
+        renderer->drawLine( cx, cx, filmback.imageGeom.y1, filmback.imageGeom.y2, options.lineColor, 0);
+        renderer->drawLine( filmback.imageGeom.x1, filmback.imageGeom.x2, cy, cy, options.lineColor, 0);
+        
+        //Draw Diagonal lines
+        renderer->drawLine( filmback.imageGeom.x1, filmback.imageGeom.x2, filmback.imageGeom.y1, filmback.imageGeom.y2, options.lineColor, 0);
+        renderer->drawLine( filmback.imageGeom.x1, filmback.imageGeom.x2, filmback.imageGeom.y2, filmback.imageGeom.y1, options.lineColor, 0);
+
+        //Draw Numbers
+        TextData td;
+        td.textAlign = 1;
+        td.textVAlign = 1;
+        td.textSize = 12;
+        td.textBold = false;
+        td.textColor = options.textColor;
+        td.textPosX = 0;
+        td.textPosY = 0;
+
+        renderer->enableTextRendering();
+        for (int i = 1; i <= numLines; i++)
+        {
+            double lx = sx * i;
+            double lx1 = filmback.imageGeom.x1 + lx;
+            double lx2 = filmback.imageGeom.x2 - lx;
+
+            double ly = sy * i;
+            double ly1 = filmback.imageGeom.y1 + ly;
+            double ly2 = filmback.imageGeom.y2 - ly;
+
+            //Draw text
+            td.textStr.set((numLines - i)+1);
+            renderer->drawText(&td,lx1,ly1);
+            renderer->drawText(&td,lx2,ly1);
+            renderer->drawText(&td,lx1,ly2);
+            renderer->drawText(&td,lx2,ly2);
+        }
+        renderer->disableTextRendering();
     }
 
     // Display the pad area
     if (pad.usePad && pad.isPadded && pad.displayMode > 0)
     {
-        drawLines(pad.padGeom, pad.padGeom.lineColor, 1, 0);
+        renderer->drawLines(pad.padGeom, pad.padGeom.lineColor, 1, pad.displayMode == 2);
     }
 
-    // Draw internal text elements
-    //drawInternalTextElements(view);
-
     // Draw custom text elements
-    if ( options.enableTextDrawing)
-        drawCustomTextElements(view);
+    if ( options.enableTextDrawing )
+        drawCustomTextElements(renderer);
 
-    // Turn off blending
-    glDisable(GL_BLEND);
-
-    // Restore blend settings
-    glBlendFunc(blendAttrs[0], blendAttrs[1]);
-
-    // Re-enable z-depth testing.
-    // Note: Moved up to drawMask() due to hack because of Maya
-    //glDepthMask( GL_TRUE );
-
-    // Restore matrix
-    glMatrixMode( GL_PROJECTION );
-    glPopMatrix();
-    glMatrixMode( GL_MODELVIEW );
-    glPopMatrix();
-
-    // Restore all attributes
-    glPopAttrib();
-
-    // End of openGL calls
-    view.endGL();
+    // Clean-up after draw
+    renderer->postDraw();
 }
 
-// Make a huge bounding box
+// This is the main function which draws the locator. It is called
+// by Maya whenever a 3D view needs to be refreshed.
 //
-MBoundingBox spReticleLoc::boundingBox() const
+void spReticleLoc::draw(M3dView & view, const MDagPath & path, 
+                         M3dView::DisplayStyle style,
+                         M3dView::DisplayStatus status)
 {
-    return MBoundingBox(MPoint(-1000000,-1000000,-1000000),
-                        MPoint(1000000,1000000,1000000));
+    MStatus stat;
+    MPlug p;
+
+    // Get the dagPath, node and function set for the currently displaying camera
+    MDagPath cameraPath;
+    view.getCamera(cameraPath);
+
+    // Prep the data for drawing
+    if (!prepForDraw(thisMObject(), path, cameraPath))
+        return;
+	
+    // Get the view ready for drawing
+    view.beginGL();
+
+    // Perform the draw
+    drawBase(view.portWidth(), view.portHeight(), &oglRenderer);
+	
+    // End of openGL calls
+    view.endGL();
 }
 
 // This function returns whether this locator should be effected by the
@@ -1989,24 +2102,57 @@ bool spReticleLoc::excludeAsLocator() const
 
 // This method is called just after a particular instance of the node has
 // been created. It automatically sources the proper scripts and sets the
-// loadDefault argument to 1, indicating that the first time the locator
+// loadDefault argument to true, indicating that the first time the locator
 // is drawn that it should first load the default settings for the locator.
 // This functionality allows either the show or facility to set standards
 // on the locator.
 //
 void spReticleLoc::postConstructor()
 {
+    MStatus stat;
+    MPlug p;
+
     // Tell Maya to draw this in the transparent queue
 #if MAYA_API_VERSION < 850
 #ifndef WIN32
     setTranspHandler( (TranspHandler)(&spReticleLoc::isTransparent) );
 #endif
 #endif
+
     // Load defaults
-    loadDefault = 1;
+    loadDefault = SOURCE_MEL_SCRIPT;
 
     // Set Refresh
     needRefresh = true;
+
+    // Initialize thisNode
+    thisNode = thisMObject();
+
+    // Create aliases for deprecated node attributes
+    MFnDependencyNode fnThisNode( thisNode );
+
+    // Create an alias for the useSpReticle attribute which has been deprecated for the cameraFilterMode attribute
+    p = MPlug( thisNode, CameraFilterMode );
+    fnThisNode.setAlias("useSpReticle","cameraFilterMode",p, true, &stat);
+    McheckVoid ( stat, "spReticleLoc::postConstructor, unable to alias useSpReticle attribute");
+
+    // Create an alias for the FilmGateColor and FilmGateTrans attributes
+    p = MPlug( thisNode, FilmGateLineColor );
+    fnThisNode.setAlias("filmGateColor","filmGateLineColor",p, true, &stat);
+    McheckVoid ( stat, "spReticleLoc::postConstructor, unable to alias filmGateColor attribute");
+
+    p = MPlug( thisNode, FilmGateLineTrans );
+    fnThisNode.setAlias("filmGateTrans","filmGateLineTrans",p, true, &stat);
+    McheckVoid ( stat, "spReticleLoc::postConstructor, unable to alias filmGateTrans attribute");
+
+    // Create an alias for the ProjGateColor and ProjGateTrans attributes
+    p = MPlug( thisNode, ProjGateLineColor );
+    fnThisNode.setAlias("projGateColor","projGateLineColor",p, true, &stat);
+    McheckVoid ( stat, "spReticleLoc::postConstructor, unable to alias projGateColor attribute");
+
+    p = MPlug( thisNode, ProjGateLineTrans );
+    fnThisNode.setAlias("projGateTrans","projGateLineTrans",p, true, &stat);
+    McheckVoid ( stat, "spReticleLoc::postConstructor, unable to alias projGateTrans attribute");
 }
 
 void * spReticleLoc::creator()
@@ -2022,6 +2168,7 @@ MStatus spReticleLoc::initialize()
     MFnCompoundAttribute cAttr;
     MFnUnitAttribute     uAttr;
     MFnTypedAttribute    tAttr;
+    MFnMessageAttribute  mAttr;
 
     // Define a default empty string
     MString defaultString("");
@@ -2036,7 +2183,7 @@ MStatus spReticleLoc::initialize()
     McheckStatus(stat,"create enableTextDrawing attribute");
     nAttr.setInternal(true);
 
-HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumericData::kFloat, 0.864, &stat );
+    HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumericData::kFloat, 0.864, &stat );
     McheckStatus(stat,"create horizontalFilmAperture attribute");
     nAttr.setInternal(true);
 
@@ -2047,14 +2194,22 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     FilmbackAperture = nAttr.create( "filmbackAperture", "cap", HorizontalFilmAperture, VerticalFilmAperture, MObject::kNullObj, &stat );
     nAttr.setDefault( 0.864, 0.630 );
 
+    RelativeFilmback = nAttr.create( "relativeFilmback", "rfb", MFnNumericData::kBoolean, 1, &stat );
+    McheckStatus(stat,"create relativeFilmback attribute");
+    nAttr.setInternal(true);
+
     SoundTrackWidth = nAttr.create( "soundTrackWidth", "stw", MFnNumericData::kFloat, 0.0, &stat );
     McheckStatus(stat,"create soundTrackWidth attribute");
     nAttr.setInternal(true);
-
-    DisplayFilmGate = nAttr.create( "displayFilmGate", "dfg", MFnNumericData::kBoolean, false, &stat );
+    
+    DisplayFilmGate = eAttr.create( "displayFilmGate", "dfg", 0, &stat );
     McheckStatus(stat,"create displayFilmGate attribute");
-    nAttr.setInternal(true);
-
+    eAttr.addField("off", 0);
+    eAttr.addField("lines", 1);
+    eAttr.addField("dashed lines", 2);
+    eAttr.addField("Transparent Mask", 3);
+    eAttr.setInternal(true);
+    
     HorizontalProjectionGate = nAttr.create( "horizontalProjectionGate", "hpg", MFnNumericData::kFloat, 0.825, &stat );
     McheckStatus(stat,"create horizontalProjectionGate attribute");
     nAttr.setInternal(true);
@@ -2065,11 +2220,15 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
 
     ProjectionGate = nAttr.create( "projectionGate", "pg", HorizontalProjectionGate, VerticalProjectionGate, MObject::kNullObj, &stat );
     nAttr.setDefault( 0.825, 0.446 );
-
-    DisplayProjectionGate = nAttr.create( "displayProjGate", "dpg", MFnNumericData::kBoolean, false, &stat );
+    
+    DisplayProjectionGate = eAttr.create( "displayProjGate", "dpg", 0, &stat );
     McheckStatus(stat,"create displayProjGate attribute");
-    nAttr.setInternal(true);
-
+    eAttr.addField("off", 0);
+    eAttr.addField("lines", 1);
+    eAttr.addField("dashed lines", 2);
+    eAttr.addField("Transparent Mask", 3);
+    eAttr.setInternal(true);
+    
     HorizontalSafeAction = nAttr.create( "horizontalSafeAction", "hsa", MFnNumericData::kFloat, 0.713, &stat );
     McheckStatus(stat,"create horizontalSafeAction attribute");
     nAttr.setInternal(true);
@@ -2081,9 +2240,12 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     SafeAction = nAttr.create( "safeAction", "sa", HorizontalSafeAction, VerticalSafeAction, MObject::kNullObj, &stat );
     nAttr.setDefault( 0.713, 0.535 );
 
-    DisplaySafeAction = nAttr.create( "displaySafeAction", "dsa", MFnNumericData::kBoolean, false, &stat );
+    DisplaySafeAction = eAttr.create( "displaySafeAction", "dsa", 0, &stat );
     McheckStatus(stat,"create displaySafeAction attribute");
-    nAttr.setInternal(true);
+    eAttr.addField("off", 0);
+    eAttr.addField("lines", 1);
+    eAttr.addField("dashed lines", 2);
+    eAttr.setInternal(true);
 
     HorizontalSafeTitle = nAttr.create( "horizontalSafeTitle", "hst", MFnNumericData::kFloat, 0.630, &stat );
     McheckStatus(stat,"create horizontalSafeTitle attribute");
@@ -2096,19 +2258,23 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     SafeTitle = nAttr.create( "safeTitle", "st", HorizontalSafeTitle, VerticalSafeTitle, MObject::kNullObj, &stat );
     nAttr.setDefault( 0.630, 0.475 );
 
-    DisplaySafeTitle = nAttr.create( "displaySafeTitle", "dst", MFnNumericData::kBoolean, false, &stat );
+    DisplaySafeTitle = eAttr.create( "displaySafeTitle", "dst", 0, &stat );
     McheckStatus(stat,"create displaySafeTitle attribute");
-    nAttr.setInternal(true);
+    eAttr.addField("off", 0);
+    eAttr.addField("lines", 1);
+    eAttr.addField("dashed lines", 2);
+    eAttr.setInternal(true);
 
     AspectRatio = nAttr.create( "aspectRatio", "ar", MFnNumericData::kFloat, 1.85, &stat );
     McheckStatus(stat,"create aspectRatio attribute");
     nAttr.setInternal(true);
 
-    DisplayMode = eAttr.create( "displayMode", "dm", 2, &stat );
+    DisplayMode = eAttr.create( "displayMode", "dm", 0, &stat );
     McheckStatus(stat, "create displayMode attribute");
     eAttr.addField("none", 0);
     eAttr.addField("lines", 1);
-    eAttr.addField("Transparent Mask", 2);
+    eAttr.addField("dashed lines", 2);
+    eAttr.addField("Transparent Mask", 3);
     eAttr.setInternal(true);
 
     AspectMaskColor = nAttr.createColor( "aspectMaskColor", "amc", &stat );
@@ -2133,13 +2299,21 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     nAttr.setMax(1.0);
     nAttr.setInternal(true);
 
-    AspectDisplaySafeTitle = nAttr.create( "aspectDisplaySafeTitle", "adst", MFnNumericData::kBoolean, false, &stat );
+    AspectDisplaySafeTitle = eAttr.create( "aspectDisplaySafeTitle", "adst", 0, &stat );
     McheckStatus(stat,"create aspectDisplaySafeTitle attribute");
-    nAttr.setInternal(true);
+    eAttr.addField("off", 0);
+    eAttr.addField("lines", 1);
+    eAttr.addField("dashed lines", 2);
+    eAttr.addField("Transparent Mask", 3);
+    eAttr.setInternal(true);
 
-    AspectDisplaySafeAction = nAttr.create( "aspectDisplaySafeAction", "adsa", MFnNumericData::kBoolean, false, &stat );
+    AspectDisplaySafeAction = eAttr.create( "aspectDisplaySafeAction", "adsa", 0, &stat );
     McheckStatus(stat,"create aspectDisplaySafeAction attribute");
-    nAttr.setInternal(true);
+    eAttr.addField("off", 0);
+    eAttr.addField("lines", 1);
+    eAttr.addField("dashed lines", 2);
+    eAttr.addField("Transparent Mask", 3);
+    eAttr.setInternal(true);
 
     AspectRatios = cAttr.create( "aspectRatios", "ars", &stat );
     McheckStatus(stat,"create aspectRatios attribute");
@@ -2153,6 +2327,7 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     cAttr.addChild( AspectDisplaySafeTitle );
     cAttr.setArray( true );
     cAttr.setIndexMatters( true );
+    cAttr.setStorable(true);
 
     PanScanAspectRatio = nAttr.create( "panScanAspectRatio", "psar", MFnNumericData::kFloat, -1, &stat );
     McheckStatus(stat,"create panScanAspectRatio attribute");
@@ -2165,13 +2340,21 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     eAttr.addField("Transparent Mask", 2);
     eAttr.setInternal(true);
 
-    PanScanDisplaySafeTitle = nAttr.create( "panScanDisplaySafeTitle", "psdst", MFnNumericData::kBoolean, false, &stat );
+    PanScanDisplaySafeTitle = eAttr.create( "panScanDisplaySafeTitle", "psdst", 0, &stat );
     McheckStatus(stat,"create panScanDisplaySafeTitle attribute");
-    nAttr.setInternal(true);
+    eAttr.addField("off", 0);
+    eAttr.addField("lines", 1);
+    eAttr.addField("dashed lines", 2);
+    eAttr.addField("Transparent Mask", 3);
+    eAttr.setInternal(true);
 
-    PanScanDisplaySafeAction = nAttr.create( "panScanDisplaySafeAction", "psdsa", MFnNumericData::kBoolean, false, &stat );
+    PanScanDisplaySafeAction = eAttr.create( "panScanDisplaySafeAction", "psdsa", 0, &stat );
     McheckStatus(stat,"create panScanDisplaySafeAction attribute");
-    nAttr.setInternal(true);
+    eAttr.addField("off", 0);
+    eAttr.addField("lines", 1);
+    eAttr.addField("dashed lines", 2);
+    eAttr.addField("Transparent Mask", 3);
+    eAttr.setInternal(true);
 
     PanScanMaskColor = nAttr.createColor( "panScanMaskColor", "psmc", &stat );
     nAttr.setDefault( 1.0, 1.0, 0.8 );
@@ -2248,7 +2431,6 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
 
     TextStr = tAttr.create( "textStr", "tstr", MFnStringData::kString );
     McheckStatus(stat,"create textStr attribute");
-    tAttr.setConnectable(false);
     tAttr.setDefault(defaultTextAttr);
     tAttr.setInternal(true);
 
@@ -2310,6 +2492,31 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     nAttr.setMax(1.0);
     nAttr.setInternal(true);
 
+    TextEnabled = nAttr.create( "textEnabled", "ten", MFnNumericData::kBoolean, true, &stat );
+    McheckStatus( stat, "create textEnabled attribute");
+
+    TextBold = nAttr.create( "textBold", "tbld", MFnNumericData::kBoolean, false, &stat );
+    McheckStatus(stat, "create textBold attribute");
+    nAttr.setInternal(true);
+
+    TextSize = nAttr.create( "textSize", "tsiz", MFnNumericData::kInt, 12, &stat );
+    nAttr.setMin(MINFONT);
+    nAttr.setSoftMax(MAXFONT);
+    nAttr.setMax(MAXFONT*2);
+    McheckStatus(stat, "create textSize attribute");
+    nAttr.setInternal(true);
+
+    TextScale = nAttr.create( "textScale", "tscl", MFnNumericData::kBoolean, false, &stat );
+    McheckStatus(stat, "create textScale attribute");
+    nAttr.setInternal(true);
+
+    TextVAlign = eAttr.create( "textVAlign", "tva", 0, &stat );
+    McheckStatus(stat, "create textVAlign attribute");
+    eAttr.addField("Bottom", 0);
+    eAttr.addField("Middle", 1);
+    eAttr.addField("Top", 2);
+    eAttr.setInternal(true);
+
     Text = cAttr.create( "text", "txt", &stat );
     McheckStatus(stat,"create text attribute");
     cAttr.addChild( TextType );
@@ -2321,6 +2528,11 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     cAttr.addChild( TextARLevel );
     cAttr.addChild( TextColor );
     cAttr.addChild( TextTrans );
+    cAttr.addChild( TextEnabled );
+    cAttr.addChild( TextBold );
+    cAttr.addChild( TextSize );
+    cAttr.addChild( TextScale );
+    cAttr.addChild( TextVAlign );
     cAttr.setArray( true );
     cAttr.setIndexMatters( true );
 
@@ -2347,35 +2559,73 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     nAttr.setMax(1.0);
     nAttr.setInternal(true);
 
-    FilmGateColor = nAttr.createColor( "filmGateColor", "fg", &stat );
-    nAttr.setDefault( 1.0, 1.0, 1.0 );
+    FilmGateMaskColor = nAttr.createColor( "filmGateMaskColor", "fgmc", &stat );
+    McheckStatus(stat,"create filmGateMaskColor attribute");
+    nAttr.setDefault( 0.0, 0.0, 0.0 );
     nAttr.setUsedAsColor( true );
     nAttr.setInternal(true);
 
-    FilmGateTrans = nAttr.create( "filmGateTrans", "fgt", MFnNumericData::kFloat, 0.25, &stat );
-    McheckStatus(stat,"create filmGateTrans attribute");
+    FilmGateMaskTrans = nAttr.create( "filmGateMaskTrans", "fgmt", MFnNumericData::kFloat, 0.25, &stat );
+    McheckStatus(stat,"create filmGateMaskTrans attribute");
     nAttr.setMin(0.0);
     nAttr.setMax(1.0);
     nAttr.setInternal(true);
 
-    ProjGateColor = nAttr.createColor( "projGateColor", "pgc", &stat );
+    FilmGateLineColor = nAttr.createColor( "filmGateLineColor", "fglc", &stat );
+    McheckStatus(stat,"create filmGateLineColor attribute");
     nAttr.setDefault( 1.0, 1.0, 1.0 );
     nAttr.setUsedAsColor( true );
     nAttr.setInternal(true);
 
-    ProjGateTrans = nAttr.create( "projGateTrans", "pgt", MFnNumericData::kFloat, 0.25, &stat );
-    McheckStatus(stat,"create projGateTrans attribute");
+    FilmGateLineTrans = nAttr.create( "filmGateLineTrans", "fglt", MFnNumericData::kFloat, 0.25, &stat );
+    McheckStatus(stat,"create filmGateLineTrans attribute");
     nAttr.setMin(0.0);
     nAttr.setMax(1.0);
     nAttr.setInternal(true);
 
-    HideLocator = nAttr.create( "hideLocator", "hlc", MFnNumericData::kBoolean, false, &stat );
+    ProjGateMaskColor = nAttr.createColor( "projGateMaskColor", "pgmc", &stat );
+    McheckStatus(stat,"create projGateMaskColor attribute");
+    nAttr.setDefault( 1.0, 1.0, 1.0 );
+    nAttr.setUsedAsColor( true );
+    nAttr.setInternal(true);
+
+    ProjGateMaskTrans = nAttr.create( "projGateMaskTrans", "pgmt", MFnNumericData::kFloat, 0.75, &stat );
+    McheckStatus(stat,"create projGateMaskTrans attribute");
+    nAttr.setMin(0.0);
+    nAttr.setMax(1.0);
+    nAttr.setInternal(true);
+
+    ProjGateLineColor = nAttr.createColor( "projGateLineColor", "pglc", &stat );
+    McheckStatus(stat,"create projGateLineColor attribute");
+    nAttr.setDefault( 1.0, 1.0, 1.0 );
+    nAttr.setUsedAsColor( true );
+    nAttr.setInternal(true);
+
+    ProjGateLineTrans = nAttr.create( "projGateLineTrans", "pglt", MFnNumericData::kFloat, 0.25, &stat );
+    McheckStatus(stat,"create projGateLineTrans attribute");
+    nAttr.setMin(0.0);
+    nAttr.setMax(1.0);
+    nAttr.setInternal(true);
+
+#if MAYA_API_VERSION < 201100
+    HideLocator = nAttr.create( "hideLocator", "hl", MFnNumericData::kBoolean, false, &stat );
+#else
+    HideLocator = nAttr.create( "hideLocator", "hloc", MFnNumericData::kBoolean, false, &stat );
+#endif
     McheckStatus(stat,"create hideLocator attribute");
     nAttr.setInternal(true);
 
-    UseSpReticle = nAttr.create( "useSpReticle", "ur", MFnNumericData::kBoolean, false, &stat );
-    McheckStatus(stat,"create useSpReticle attribute");
-    nAttr.setInternal(true);
+    CameraFilterMode = eAttr.create( "cameraFilterMode", "cfm", 0, &stat );
+    McheckStatus(stat, "create cameraFilterMode attribute");
+    eAttr.addField("All Cameras", 0);
+    eAttr.addField("Cameras with " CAMERA_ATTR " attribute", 1);
+    eAttr.addField("Connected Cameras", 2);
+    eAttr.setInternal(true);
+
+    Cameras = mAttr.create( "cameras", "cams", &stat );
+    McheckStatus(stat, "create cameras attribute");
+    mAttr.setArray( true );
+    mAttr.setIndexMatters( false );
 
     DisplayLineH = nAttr.create( "displayLineH", "dlh", MFnNumericData::kBoolean, false, &stat );
     McheckStatus(stat,"create displayLineH attribute");
@@ -2395,6 +2645,10 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
 
     DisplayCrosshair = nAttr.create( "displayCrosshair", "dlc", MFnNumericData::kBoolean, false, &stat );
     McheckStatus(stat,"create displayCrosshair attribute");
+    nAttr.setInternal(true);
+
+    DisplayFieldGuide = nAttr.create( "displayFieldGuide", "dfgd", MFnNumericData::kBoolean, false, &stat );
+    McheckStatus(stat,"create displayFieldGuide attribute");
     nAttr.setInternal(true);
 
     Time = uAttr.create( "time", "tm", MFnUnitAttribute::kTime, 0.0, &stat );
@@ -2427,11 +2681,12 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     PadAmount = nAttr.create( "padAmount", "paa", PadAmountX, PadAmountY, MObject::kNullObj, &stat );
     nAttr.setDefault( 0.0, 0.0 );
 
-    PadDisplayMode = eAttr.create( "padDisplayMode", "pdm", 2, &stat );
+    PadDisplayMode = eAttr.create( "padDisplayMode", "pdm", 3, &stat );
     McheckStatus(stat, "create panScanDisplayMode attribute");
     eAttr.addField("none", 0);
     eAttr.addField("lines", 1);
-    eAttr.addField("Transparent Mask", 2);
+    eAttr.addField("dashed lines", 2);
+    eAttr.addField("Transparent Mask", 3);
     eAttr.setInternal(true);
 
     PadMaskColor = nAttr.createColor( "padMaskColor", "pmc", &stat );
@@ -2473,13 +2728,15 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     tAttr.setHidden(true);
     tAttr.setConnectable(false);
     tAttr.setDefault(defaultTextAttr);
-
+    
     stat = addAttribute(EnableTextDrawing);
         McheckStatus(stat,"addAttribute enableTextDrawing");
     stat = addAttribute (DrawingEnabled);
         McheckStatus(stat,"addAttribute drawingEnabled");
     stat = addAttribute (FilmbackAperture);
         McheckStatus(stat,"addAttribute filmbackAperture");
+    stat = addAttribute (RelativeFilmback);
+        McheckStatus(stat,"addAttribute relativeFilmback");
     stat = addAttribute (SoundTrackWidth);
         McheckStatus(stat,"addAttribute soundTrackWidth");
     stat = addAttribute (DisplayFilmGate);
@@ -2510,18 +2767,28 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
         McheckStatus(stat,"addAttribute lineColor");
     stat = addAttribute (LineTrans);
         McheckStatus(stat,"addAttribute lineTrans");
-    stat = addAttribute (FilmGateColor);
-        McheckStatus(stat,"addAttribute filmGateColor");
-    stat = addAttribute (FilmGateTrans);
-        McheckStatus(stat,"addAttribute filmGateTrans");
-    stat = addAttribute (ProjGateColor);
-        McheckStatus(stat,"addAttribute projGateColor");
-    stat = addAttribute (ProjGateTrans);
-        McheckStatus(stat,"addAttribute projGateTrans");
+    stat = addAttribute (FilmGateMaskColor);
+        McheckStatus(stat,"addAttribute filmGateMaskColor");
+    stat = addAttribute (FilmGateMaskTrans);
+        McheckStatus(stat,"addAttribute filmGateMaskTrans");
+    stat = addAttribute (FilmGateLineColor);
+        McheckStatus(stat,"addAttribute filmGateLineColor");
+    stat = addAttribute (FilmGateLineTrans);
+        McheckStatus(stat,"addAttribute filmGateLineTrans");
+    stat = addAttribute (ProjGateMaskColor);
+        McheckStatus(stat,"addAttribute projGateMaskColor");
+    stat = addAttribute (ProjGateMaskTrans);
+        McheckStatus(stat,"addAttribute projGateMaskTrans");
+    stat = addAttribute (ProjGateLineColor);
+        McheckStatus(stat,"addAttribute projGateLineColor");
+    stat = addAttribute (ProjGateLineTrans);
+        McheckStatus(stat,"addAttribute projGateLineTrans");
     stat = addAttribute (HideLocator);
         McheckStatus(stat,"addAttribute hideLocator");
-    stat = addAttribute (UseSpReticle);
-        McheckStatus(stat,"addAttribute useSpReticle");
+    stat = addAttribute (CameraFilterMode);
+        McheckStatus(stat,"addAttribute cameraFilterMode");
+    stat = addAttribute (Cameras);
+        McheckStatus(stat,"addAttribute cameras");
     stat = addAttribute (DisplayLineH);
         McheckStatus(stat,"addAttribute displayLineH");
     stat = addAttribute (DisplayLineV);
@@ -2532,6 +2799,8 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
         McheckStatus(stat,"addAttribute displayThirdsV");
     stat = addAttribute (DisplayCrosshair);
         McheckStatus(stat,"addAttribute displayCrosshair");
+    stat = addAttribute (DisplayFieldGuide);
+        McheckStatus(stat,"addAttribute displayFieldGuide");
     stat = addAttribute (Time);
         McheckStatus(stat,"addAttribute time");
     stat = addAttribute (DriveCameraAperture);
@@ -2548,18 +2817,182 @@ HorizontalFilmAperture = nAttr.create( "horizontalFilmAperture", "hfa", MFnNumer
     return MS::kSuccess;
 }
 
+//---------------------------------------------------------------------------
+// Viewport 2.0 override implementation
+//---------------------------------------------------------------------------
+#if (MAYA_API_VERSION>=201200)
+spReticleLocDrawOverride::spReticleLocDrawOverride(const MObject& obj) : MHWRender::MPxDrawOverride(obj, spReticleLocDrawOverride::draw)
+{
+}
+
+spReticleLocDrawOverride::~spReticleLocDrawOverride()
+{
+}
+
+#if (MAYA_API_VERSION>=201400 && USE_MUIDRAWMANAGER)
+MHWRender::DrawAPI spReticleLocDrawOverride::supportedDrawAPIs() const
+{
+    // this plugin supports both GL and DX
+    return (MHWRender::kOpenGL | MHWRender::kDirectX11);
+}
+#elif (MAYA_API_VERSION>=201300)
+MHWRender::DrawAPI spReticleLocDrawOverride::supportedDrawAPIs() const
+{
+    // this plugin supports OpenGL
+    return (MHWRender::kOpenGL);
+}
+#endif
+
+#if (MAYA_API_VERSION>=201300)
+bool spReticleLocDrawOverride::isBounded(const MDagPath& /*objPath*/,
+                                      const MDagPath& /*cameraPath*/) const
+{
+    return false;
+}
+
+bool spReticleLocDrawOverride::disableInternalBoundingBoxDraw() const
+{
+    return true;
+}
+#endif
+
+MBoundingBox spReticleLocDrawOverride::boundingBox( const MDagPath& objPath,const MDagPath& cameraPath ) const
+{
+    return MBoundingBox(MPoint(-1000000,-1000000,-1000000),
+                        MPoint(1000000,1000000,1000000));
+}
+
+#if (MAYA_API_VERSION < 201400)
+MUserData* spReticleLocDrawOverride::prepareForDraw(
+                                                    const MDagPath& objPath,
+                                                    const MDagPath& cameraPath,
+                                                    MUserData* oldData)
+#else
+MUserData* spReticleLocDrawOverride::prepareForDraw(
+                                  const MDagPath& objPath,
+                                  const MDagPath& cameraPath,
+                                  const MHWRender::MFrameContext& frameContext,
+                                  MUserData* oldData)
+#endif
+{
+    MObject obj = objPath.node();
+    MFnDependencyNode node(obj);
+
+    spReticleLoc* reticle = static_cast<spReticleLoc*>(node.userNode());
+
+    bool draw = reticle->prepForDraw(obj,objPath,cameraPath);
+
+    spReticleLocData* data = new spReticleLocData();
+
+    data->reticle = reticle;
+    data->renderer = &renderer;
+    data->draw = draw;
+
+    return data;
+}
+
+#if (MAYA_API_VERSION < 201400)
+void spReticleLocDrawOverride::draw(const MHWRender::MDrawContext& context, const MUserData* data)
+{
+    int portWidth, portHeight;
+
+    context.getRenderTargetSize (portWidth, portHeight);
+
+    const spReticleLocData* drawData = static_cast<const spReticleLocData*>(data);
+    if (drawData)
+    {
+        if (drawData->draw)
+        {
+            drawData->reticle->drawBase(portWidth, portHeight, drawData->renderer);
+        }
+    }
+}
+#else
+bool spReticleLocDrawOverride::hasUIDrawables() const
+{
+    return USE_MUIDRAWMANAGER;
+}
+
+void spReticleLocDrawOverride::addUIDrawables( const MDagPath& objPath, MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext, const MUserData* data )
+{
+#if (USE_MUIDRAWMANAGER)
+    //Get the view attributes that impact drawing
+    int oX,oy,portWidth,portHeight;
+    frameContext.getViewportDimensions(oX,oy,portWidth,portHeight);
+
+    const spReticleLocData* drawData = static_cast<const spReticleLocData*>(data);
+    if (drawData)
+    {
+        if (drawData->draw)
+        {
+            renderer.setDrawManager(&drawManager);
+            drawData->reticle->drawBase(portWidth, portHeight, &renderer);
+        }
+    }
+#endif
+}
+
+void spReticleLocDrawOverride::draw(const MHWRender::MDrawContext& context, const MUserData* data)
+{
+#if (!USE_MUIDRAWMANAGER)
+    int portWidth, portHeight;
+
+    context.getRenderTargetSize (portWidth, portHeight);
+
+    const spReticleLocData* drawData = static_cast<const spReticleLocData*>(data);
+    if (drawData)
+    {
+        if (drawData->draw)
+        {
+            drawData->reticle->drawBase(portWidth, portHeight, drawData->renderer);
+        }
+    }
+#endif
+}
+#endif
+
+#endif
+
+
+//---------------------------------------------------------------------------
+// Plugin Registration
+//---------------------------------------------------------------------------
+
 MStatus initializePlugin(MObject obj)
 {
-    MFnPlugin plugin(obj, "SPI", "1.6", "Any");
+    MFnPlugin plugin(obj, "SPI", PLUGIN_VERSION, "Any");
 
-    MStatus status = plugin.registerNode( "spReticleLoc", spReticleLoc::id,
+#if (MAYA_API_VERSION<201200)
+    MStatus status = plugin.registerNode( "spReticleLoc", spReticleLoc::id, 
                          &spReticleLoc::creator, &spReticleLoc::initialize,
                          MPxNode::kLocatorNode );
+#else
+    MStatus status = plugin.registerNode( "spReticleLoc", spReticleLoc::id, 
+                         &spReticleLoc::creator, &spReticleLoc::initialize,
+                         MPxNode::kLocatorNode,
+                         &spReticleLoc::drawDbClassification);
+#endif
     if (!status)
     {
         status.perror("registerNode");
         return status;
     }
+
+#if (MAYA_API_VERSION>=201200)
+    status = MHWRender::MDrawRegistry::registerDrawOverrideCreator(
+    spReticleLoc::drawDbClassification,
+    spReticleLoc::drawRegistrantId,
+    spReticleLocDrawOverride::Creator);
+    if (!status)
+    {
+        status.perror("registerDrawOverrideCreator");
+        return status;
+    }
+#endif
+
+#if SOURCE_MEL_SCRIPT
+    MGlobal::sourceFile(SOURCE_MEL_SCRIPT_PATH);
+#endif
 
     return status;
 }
@@ -2567,8 +3000,20 @@ MStatus initializePlugin(MObject obj)
 MStatus uninitializePlugin(MObject obj)
 {
     MFnPlugin plugin( obj );
+    MStatus status;
 
-    MStatus status = plugin.deregisterNode( spReticleLoc::id );
+#if (MAYA_API_VERSION>=201200)
+    status = MHWRender::MDrawRegistry::deregisterDrawOverrideCreator(
+        spReticleLoc::drawDbClassification,
+        spReticleLoc::drawRegistrantId);
+    if (!status)
+    {
+        status.perror("deregisterDrawOverrideCreator");
+        return status;
+    }
+#endif
+
+    status = plugin.deregisterNode( spReticleLoc::id );
     if (!status)
     {
         status.perror("deregisterNode");
