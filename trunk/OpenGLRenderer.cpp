@@ -71,7 +71,7 @@ OpenGLRenderer::OpenGLRenderer()
          }
          
          // Populate glyphMap based on wchar_t
-         for (int glyphIndex = 0; glyphIndex < font->glyphs_count;glyphIndex++) {
+         for (unsigned int glyphIndex = 0; glyphIndex < font->glyphs_count;glyphIndex++) {
              TextureGlyph *glyph = &font->glyphs[glyphIndex];
              font->glyphMap[glyph->charcode] = glyph;
          }
@@ -287,7 +287,7 @@ void OpenGLRenderer::drawText(TextData *td, double tx, double ty)
         
         if (i > 0 && glyph->kerning_count) {
             double kernAmount = 0;
-            for( int kernIndex =0; kernIndex < glyph->kerning_count; kernIndex++ ) {
+            for(unsigned int kernIndex =0; kernIndex < glyph->kerning_count; kernIndex++) {
                 if (glyph->kerning[kernIndex].charcode == textPtr[i-1] ) {
                     kernAmount = glyph->kerning[kernIndex].kerning;
                     break;
